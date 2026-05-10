@@ -4,15 +4,26 @@
 対象関数:
 - score_boundary(prev, cur) -> (float, list[str])
 - build_initial_groups(pages, boundary_threshold) -> dict[str, list[dict]]
+- build_boundary_info(pages) -> list[dict]
+- render_html_report(pages, boundary_info, initial_groups) -> str
 - HTML_TEMPLATE: saveJson 関数の http/file:// 分岐
 
 テストは実際の PDF ファイルを使わない pure-Python のユニットテスト。
 """
 from __future__ import annotations
 
+import base64
+import json
+
 import pytest
 
-from pdf_split_autorenamer.analyze import HTML_TEMPLATE, build_initial_groups, score_boundary
+from pdf_split_autorenamer.analyze import (
+    HTML_TEMPLATE,
+    build_boundary_info,
+    build_initial_groups,
+    render_html_report,
+    score_boundary,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -27,6 +38,8 @@ def _make_page(
     height: float = 842.0,
     bigram: set[str] | None = None,
     title_markers: list[str] | None = None,
+    thumb: str = "",
+    text_head: str = "",
 ) -> dict:
     """テスト用の最小ページ dict を生成する"""
     return {
@@ -37,6 +50,8 @@ def _make_page(
         "height": height,
         "bigram": bigram if bigram is not None else set(),
         "title_markers": title_markers if title_markers is not None else [],
+        "thumb": thumb,
+        "text_head": text_head,
     }
 
 
@@ -255,3 +270,118 @@ class TestHtmlTemplateSaveJson:
         """fetch 呼び出しで Content-Type: application/json が指定されている"""
         assert "application/json" in HTML_TEMPLATE, \
             "Content-Type: application/json が HTML_TEMPLATE にない"
+
+
+# ---------------------------------------------------------------------------
+# build_boundary_info
+# ---------------------------------------------------------------------------
+
+class TestBuildBoundaryInfo:
+    def test_empty_pages_returns_empty(self):
+        """ページリストが空の場合は空リストを返す"""
+        assert build_boundary_info([]) == []
+
+    def test_single_page_returns_empty(self):
+        """1ページだけなら境界情報なし"""
+        assert build_boundary_info([_make_page()]) == []
+
+    def test_two_pages_returns_one_boundary(self):
+        """2ページなら境界情報が1件"""
+        pages = [_make_page(page=1), _make_page(page=2)]
+        result = build_boundary_info(pages)
+        assert len(result) == 1
+
+    def test_boundary_info_keys(self):
+        """境界情報の dict は score / reasons / cross_pdf を持つ"""
+        pages = [_make_page(page=1), _make_page(page=2)]
+        result = build_boundary_info(pages)
+        assert "score" in result[0]
+        assert "reasons" in result[0]
+        assert "cross_pdf" in result[0]
+
+    def test_cross_pdf_false_for_same_pdf(self):
+        """同じ PDF 内の境界は cross_pdf=False"""
+        pages = [
+            _make_page(pdf="a.pdf", page=1),
+            _make_page(pdf="a.pdf", page=2),
+        ]
+        result = build_boundary_info(pages)
+        assert result[0]["cross_pdf"] is False
+
+    def test_cross_pdf_true_for_different_pdf(self):
+        """別 PDF をまたぐ境界は cross_pdf=True"""
+        pages = [
+            _make_page(pdf="a.pdf", page=3),
+            _make_page(pdf="b.pdf", page=1),
+        ]
+        result = build_boundary_info(pages)
+        assert result[0]["cross_pdf"] is True
+
+    def test_score_rounded_to_2_decimals(self):
+        """score は小数点以下 2 桁に丸められている"""
+        pages = [_make_page(page=1), _make_page(page=2)]
+        result = build_boundary_info(pages)
+        score = result[0]["score"]
+        assert score == round(score, 2)
+
+    def test_n_pages_returns_n_minus_1_boundaries(self):
+        """n ページなら n-1 件の境界情報"""
+        pages = [_make_page(page=i) for i in range(1, 6)]
+        result = build_boundary_info(pages)
+        assert len(result) == 4
+
+
+# ---------------------------------------------------------------------------
+# render_html_report
+# ---------------------------------------------------------------------------
+
+class TestRenderHtmlReport:
+    def _make_minimal_pages(self, n: int = 1) -> list[dict]:
+        return [_make_page(pdf="a.pdf", page=i, text_head=f"ページ{i}") for i in range(1, n + 1)]
+
+    def test_returns_string(self):
+        """render_html_report は文字列を返す"""
+        pages = self._make_minimal_pages(1)
+        boundaries = build_boundary_info(pages)
+        groups = build_initial_groups(pages)
+        result = render_html_report(pages, boundaries, groups)
+        assert isinstance(result, str)
+
+    def test_html_doctype_present(self):
+        """生成 HTML は doctype を含む"""
+        pages = self._make_minimal_pages(1)
+        result = render_html_report(pages, build_boundary_info(pages), build_initial_groups(pages))
+        assert "<!doctype html>" in result.lower()
+
+    def test_title_substituted(self):
+        """タイトルが HTML に埋め込まれる"""
+        pages = self._make_minimal_pages(1)
+        result = render_html_report(
+            pages, build_boundary_info(pages), build_initial_groups(pages),
+            title="テストレポート"
+        )
+        assert "テストレポート" in result
+
+    def test_payload_base64_embedded(self):
+        """ページデータが base64 として HTML に埋め込まれ、デコードできる"""
+        pages = self._make_minimal_pages(2)
+        boundaries = build_boundary_info(pages)
+        groups = build_initial_groups(pages)
+        html = render_html_report(pages, boundaries, groups)
+        # __PAYLOAD__ が置換されていること
+        assert "__PAYLOAD__" not in html
+        # base64 部分を取り出してデコードできることを確認
+        import re
+        m = re.search(r'atob\("([A-Za-z0-9+/=]+)"\)', html)
+        if m:
+            decoded = json.loads(base64.b64decode(m.group(1)).decode("utf-8"))
+            assert "pages" in decoded
+            assert len(decoded["pages"]) == 2
+
+    def test_default_title_applied(self):
+        """デフォルトタイトルは 'PDF 分割レビュー'"""
+        pages = self._make_minimal_pages(1)
+        result = render_html_report(
+            pages, build_boundary_info(pages), build_initial_groups(pages)
+        )
+        assert "PDF 分割レビュー" in result
