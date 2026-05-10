@@ -80,3 +80,4 @@ desktop.ini
 *.tmp
 _*.txt
 _*.py
+!**/__main__.py
