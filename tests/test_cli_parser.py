@@ -305,6 +305,48 @@ class TestCmdAnalyze:
             result = cmd_analyze(args)
         assert result == 0
 
+    def test_cmd_analyze_llm_strategy_tty_user_confirms(self, tmp_path):
+        """--ocr-strategy llm で TTY から 'y' を入力したら続行する"""
+        from pdf_split_autorenamer.cli import cmd_analyze
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            pdftotext=None,
+            title="Test",
+            no_ocr_fallback=False,
+            ocr_strategy="llm",
+            yes=False,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
+        with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result), \
+             patch("sys.stdin.isatty", return_value=True), \
+             patch("builtins.input", return_value="y"):
+            result = cmd_analyze(args)
+        assert result == 0
+
+    def test_cmd_analyze_llm_strategy_tty_user_aborts(self, tmp_path):
+        """--ocr-strategy llm で TTY から 'n' を入力したら 1 を返す"""
+        from pdf_split_autorenamer.cli import cmd_analyze
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            pdftotext=None,
+            title="Test",
+            no_ocr_fallback=False,
+            ocr_strategy="llm",
+            yes=False,
+            verbose=False,
+            quiet=False,
+        )
+        with patch("sys.stdin.isatty", return_value=True), \
+             patch("builtins.input", return_value="n"):
+            result = cmd_analyze(args)
+        assert result == 1
+
 
 class TestCmdSplit:
     def test_cmd_split_file_not_found(self, tmp_path):

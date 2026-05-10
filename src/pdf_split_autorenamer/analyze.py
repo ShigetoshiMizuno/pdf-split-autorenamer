@@ -53,7 +53,7 @@ except Exception:  # pragma: no cover
 def _try_llm_vision(roi_bytes: bytes) -> str:
     """ClaudeVisionBackend で ROI 画像から日付・タイトルを構造化抽出。失敗時は ''。"""
     try:
-        if ClaudeVisionBackend is None:
+        if ClaudeVisionBackend is None:  # pragma: no cover
             return ""
         backend = ClaudeVisionBackend()
         if not backend.is_available():

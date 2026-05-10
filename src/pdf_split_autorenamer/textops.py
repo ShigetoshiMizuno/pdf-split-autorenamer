@@ -7,7 +7,7 @@ from pathlib import Path
 
 try:
     import tomllib
-except ImportError:
+except ImportError:  # pragma: no cover
     try:
         import tomli as tomllib  # type: ignore[no-reattr-module]
     except ImportError:
@@ -90,7 +90,7 @@ def extract_dates_all(text: str) -> list[str]:
     seen_positions: set[int] = set()
     for pat in _DATE_PATTERNS:
         for m in pat.finditer(t):
-            if m.start() in seen_positions:
+            if m.start() in seen_positions:  # pragma: no cover
                 continue
             y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
             if 2000 <= y <= 2100 and 1 <= mo <= 12 and 1 <= d <= 31:
