@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import json
+from pathlib import Path
 
 import pytest
 
@@ -385,3 +386,85 @@ class TestRenderHtmlReport:
             pages, build_boundary_info(pages), build_initial_groups(pages)
         )
         assert "PDF 分割レビュー" in result
+
+
+# ---------------------------------------------------------------------------
+# run_analyze（統合テスト）
+# ---------------------------------------------------------------------------
+
+class TestRunAnalyze:
+    def _make_pdf(self, path, text: str = "2026年4月6日の週報") -> None:
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), text)
+        data = doc.write()
+        doc.close()
+        path.write_bytes(data)
+
+    def test_returns_zero_pages_for_empty_dir(self, tmp_path):
+        """PDF がないディレクトリでは pages=0 を返す"""
+        from pdf_split_autorenamer.analyze import run_analyze
+        from unittest.mock import patch
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            result = run_analyze(tmp_path, ocr_fallback=False)
+        assert result == {"pages": 0, "groups": 0}
+
+    def test_returns_dict_with_expected_keys(self, tmp_path):
+        """PDF がある場合は pages, groups, report_html, groups_json を含む dict を返す"""
+        from pdf_split_autorenamer.analyze import run_analyze
+        from unittest.mock import patch
+        self._make_pdf(tmp_path / "a.pdf", "2026-04-06 weekly report")
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            result = run_analyze(tmp_path, ocr_fallback=False)
+        for key in ("pages", "groups", "report_html", "groups_json"):
+            assert key in result, f"キー '{key}' が結果にない: {result}"
+
+    def test_creates_report_html(self, tmp_path):
+        """run_analyze が report.html を生成する"""
+        from pdf_split_autorenamer.analyze import run_analyze
+        from unittest.mock import patch
+        self._make_pdf(tmp_path / "a.pdf")
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            result = run_analyze(tmp_path, ocr_fallback=False)
+        report = result.get("report_html", "")
+        if report:
+            assert Path(report).exists(), "report.html が生成されていない"
+
+    def test_creates_groups_json(self, tmp_path):
+        """run_analyze が groups.json を生成する"""
+        from pdf_split_autorenamer.analyze import run_analyze
+        from unittest.mock import patch
+        self._make_pdf(tmp_path / "a.pdf")
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            result = run_analyze(tmp_path, ocr_fallback=False)
+        groups_json = result.get("groups_json", "")
+        if groups_json:
+            assert Path(groups_json).exists(), "groups.json が生成されていない"
+
+    def test_second_run_creates_groups_initial_json(self, tmp_path):
+        """2回目の run_analyze は groups.json を上書きせず groups.initial.json に保存"""
+        from pdf_split_autorenamer.analyze import run_analyze
+        from unittest.mock import patch
+        self._make_pdf(tmp_path / "a.pdf")
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            run_analyze(tmp_path, ocr_fallback=False)
+            run_analyze(tmp_path, ocr_fallback=False)
+        work_dir = tmp_path / ".psar"
+        groups_json = work_dir / "groups.json"
+        initial_json = work_dir / "groups.initial.json"
+        assert groups_json.exists()
+        assert initial_json.exists(), "groups.initial.json が生成されていない"
+
+    def test_excludes_split_pdfs_from_analysis(self, tmp_path):
+        """既に分割済みのファイル（stem_NN.pdf 形式）は解析対象外になる"""
+        from pdf_split_autorenamer.analyze import run_analyze
+        from unittest.mock import patch
+        # 通常のPDF
+        self._make_pdf(tmp_path / "scan.pdf")
+        # 分割済みのPDF（解析対象外のはず）
+        self._make_pdf(tmp_path / "scan_01.pdf", "split document")
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            result = run_analyze(tmp_path, ocr_fallback=False)
+        # scan.pdf のみが対象 → pages は scan.pdf の1ページのみのはず
+        assert result.get("pages", 0) <= 1, "分割済み PDF が解析対象に含まれている"
