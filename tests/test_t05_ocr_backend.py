@@ -616,7 +616,7 @@ class TestEasyOCRBackend:
         result = backend.extract_text(b"fake_image")
         assert result == ""
 
-    def test_extract_text_success_with_mock(self, monkeypatch):
+    def test_extract_text_success_with_mock(self, monkeypatch, tmp_path):
         """easyocr が利用可能な場合、テキストを結合して返す"""
         import sys
         from unittest.mock import MagicMock, patch
@@ -625,8 +625,12 @@ class TestEasyOCRBackend:
         fake_easyocr.Reader.return_value = fake_reader
         fake_reader.readtext.return_value = ["2026年4月6日", "主日礼拝"]
         monkeypatch.setitem(sys.modules, "easyocr", fake_easyocr)
-        with patch("PIL.Image.open") as mock_open:
-            mock_open.return_value = MagicMock()
+        with patch("tempfile.NamedTemporaryFile") as mock_tmpfile, \
+             patch("os.unlink"):
+            mock_ctx = MagicMock()
+            mock_ctx.__enter__ = MagicMock(return_value=MagicMock(name=str(tmp_path / "t.png")))
+            mock_ctx.__exit__ = MagicMock(return_value=False)
+            mock_tmpfile.return_value = mock_ctx
             from pdf_split_autorenamer.ocr_backend import EasyOCRBackend
             backend = EasyOCRBackend()
             result = backend.extract_text(b"fake_image")

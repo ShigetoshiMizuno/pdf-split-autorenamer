@@ -146,11 +146,16 @@ class EasyOCRBackend(OcrBackend):
 
         easy_lang = ["ja"] if lang == "jpn" else [lang]
         try:
-            import io
-            from PIL import Image  # type: ignore[import-untyped]
-            img = Image.open(io.BytesIO(image_bytes))
-            reader = easyocr.Reader(easy_lang, gpu=False, verbose=False)
-            results = reader.readtext(img, detail=0, paragraph=True)
+            import os
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                f.write(image_bytes)
+                tmp = f.name
+            try:
+                reader = easyocr.Reader(easy_lang, gpu=False, verbose=False)
+                results = reader.readtext(tmp, detail=0, paragraph=True)
+            finally:
+                os.unlink(tmp)
             return "\n".join(str(r) for r in results)
         except Exception as e:
             import logging
