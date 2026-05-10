@@ -8,11 +8,14 @@ import fitz
 import pytest
 
 from pdf_split_autorenamer.pdfio import (
+    avg_phash,
     extract_text,
+    extract_text_pdftotext,
     extract_text_pymupdf,
     find_pdftotext,
     hamming,
     list_pdfs,
+    render_thumb,
     save_pdf_pages,
 )
 
@@ -66,6 +69,16 @@ class TestExtractTextPymupdf:
         assert result == ""
 
 
+class TestExtractTextPdftotext:
+    def test_returns_empty_when_no_pdftotext_available(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("PDFTOTEXT", raising=False)
+        from unittest.mock import patch
+        with patch("shutil.which", return_value=None):
+            with patch("pathlib.Path.is_file", return_value=False):
+                result = extract_text_pdftotext(tmp_path / "test.pdf", pdftotext=None)
+        assert result == ""
+
+
 class TestExtractText:
     def test_falls_back_to_pymupdf_when_no_pdftotext(self, tmp_path):
         pdf = _make_pdf(tmp_path / "test.pdf", text="Fallback text")
@@ -101,6 +114,43 @@ class TestHamming:
 
     def test_single_bit_difference(self):
         assert hamming(0b0001, 0b0000) == 1
+
+
+class TestRenderThumb:
+    def test_creates_jpeg_file(self, tmp_path):
+        doc = fitz.open()
+        doc.new_page()
+        out = tmp_path / "thumb.jpg"
+        render_thumb(doc[0], out)
+        doc.close()
+        assert out.exists()
+        assert out.stat().st_size > 0
+
+    def test_respects_max_long_side(self, tmp_path):
+        doc = fitz.open()
+        doc.new_page(width=1200, height=900)
+        out = tmp_path / "thumb.jpg"
+        render_thumb(doc[0], out, max_long_side=300)
+        doc.close()
+        assert out.exists()
+
+
+class TestAvgPhash:
+    def test_returns_int(self):
+        doc = fitz.open()
+        doc.new_page()
+        result = avg_phash(doc[0])
+        doc.close()
+        assert isinstance(result, int)
+
+    def test_identical_pages_have_identical_hash(self):
+        doc = fitz.open()
+        doc.new_page()
+        doc.new_page()
+        h1 = avg_phash(doc[0])
+        h2 = avg_phash(doc[1])
+        doc.close()
+        assert h1 == h2
 
 
 class TestListPdfs:

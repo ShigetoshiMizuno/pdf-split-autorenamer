@@ -37,6 +37,12 @@ class TestFixBrokenUnicode:
     def test_clean_ascii_unchanged(self):
         assert fix_broken_unicode("hello") == "hello"
 
+    def test_cp1252_invalid_utf8_path(self):
+        # "€" encodes to b"\x80" in cp1252, which is an invalid UTF-8 start byte.
+        # This exercises the `except UnicodeDecodeError: continue` branch (lines 40-41).
+        result = fix_broken_unicode("€")
+        assert isinstance(result, str)  # returns unchanged "€"
+
 
 class TestExtractDatesAll:
     def test_iso_format(self):
@@ -87,6 +93,13 @@ class TestExtractKind:
         text = "\n\n\n\n\n\n主日礼拝メッセージ要旨"  # after 6 head lines
         result = extract_kind(text)
         assert result == "主日礼拝メッセージ要旨"
+
+    def test_body_only_pattern_after_six_non_matching_lines(self):
+        # "祈祷会" is in DEFAULT_BODY_PATTERNS but not in DEFAULT_TITLE_PATTERNS.
+        # Putting it after 6 non-empty non-matching lines forces the body branch (line 137).
+        lines = ["行1", "行2", "行3", "行4", "行5", "行6", "祈祷会"]
+        result = extract_kind("\n".join(lines))
+        assert result == "祈祷会"
 
 
 class TestSanitizeFilename:

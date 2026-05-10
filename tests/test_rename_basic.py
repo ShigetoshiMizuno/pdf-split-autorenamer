@@ -193,3 +193,10 @@ class TestRunRename:
         _make_pdf(src)  # no recognizable kind in text → should use fallback
         result = run_rename(tmp_path, mode="split")
         assert result["targets"] >= 1
+
+    def test_noop_when_destination_equals_source(self, tmp_path):
+        # "日付不明_週報.pdf" → kind="週報", date=None → final="日付不明_週報.pdf" (same name)
+        src = tmp_path / "日付不明_週報.pdf"
+        _make_pdf(src)  # no text, kind inferred from filename
+        result = run_rename(tmp_path, mode="unknown")
+        assert any(a["status"] == "noop" for a in result["actions"])
