@@ -169,3 +169,55 @@ class TestCollectPagesOcrStrategy:
             analyze.collect_pages(tmp_path, tmp_path / "thumbs", ocr_strategy="roi")
 
         mock_crop.assert_called()
+
+    def test_roi_cache_hit_uses_cached_text(self, tmp_path):
+        """ROI OCR でキャッシュヒットした場合はキャッシュのテキストを使う（analyze.py L91）"""
+        from pdf_split_autorenamer import analyze
+
+        fake_pdf = self._make_fake_pdf()
+        fake_page = MagicMock()
+        fake_page.rect = MagicMock()
+        fake_page.rect.width = 595.0
+        fake_page.rect.height = 842.0
+        fake_doc = MagicMock()
+        fake_doc.page_count = 1
+        fake_doc.__getitem__ = MagicMock(return_value=fake_page)
+
+        with patch("pdf_split_autorenamer.analyze.list_pdfs", return_value=[fake_pdf]), \
+             patch("pdf_split_autorenamer.analyze.fitz") as mock_fitz, \
+             patch("pdf_split_autorenamer.analyze.extract_text", return_value=""), \
+             patch("pdf_split_autorenamer.analyze.crop_page_pixmap", return_value=b"png"), \
+             patch("pdf_split_autorenamer.analyze.get_ocr_cache_path", return_value=tmp_path / "cache.txt"), \
+             patch("pdf_split_autorenamer.analyze.read_ocr_cache", return_value="キャッシュテキスト"), \
+             patch("pdf_split_autorenamer.analyze.render_thumb"):
+            mock_fitz.open.return_value = fake_doc
+            pages = analyze.collect_pages(tmp_path, tmp_path / "thumbs", ocr_strategy="roi")
+
+        assert any("キャッシュテキスト" in p.get("text", "") for p in pages)
+
+    def test_roi_ocr_success_uses_roi_text(self, tmp_path):
+        """ROI OCR が成功した場合は roi_text でテキストを上書きする（analyze.py L95）"""
+        from pdf_split_autorenamer import analyze
+
+        fake_pdf = self._make_fake_pdf()
+        fake_page = MagicMock()
+        fake_page.rect = MagicMock()
+        fake_page.rect.width = 595.0
+        fake_page.rect.height = 842.0
+        fake_doc = MagicMock()
+        fake_doc.page_count = 1
+        fake_doc.__getitem__ = MagicMock(return_value=fake_page)
+
+        with patch("pdf_split_autorenamer.analyze.list_pdfs", return_value=[fake_pdf]), \
+             patch("pdf_split_autorenamer.analyze.fitz") as mock_fitz, \
+             patch("pdf_split_autorenamer.analyze.extract_text", return_value=""), \
+             patch("pdf_split_autorenamer.analyze.crop_page_pixmap", return_value=b"png"), \
+             patch("pdf_split_autorenamer.analyze.get_ocr_cache_path", return_value=tmp_path / "cache.txt"), \
+             patch("pdf_split_autorenamer.analyze.read_ocr_cache", return_value=None), \
+             patch("pdf_split_autorenamer.analyze.extract_text_tesseract", return_value="ROI抽出テキスト"), \
+             patch("pdf_split_autorenamer.analyze.write_ocr_cache"), \
+             patch("pdf_split_autorenamer.analyze.render_thumb"):
+            mock_fitz.open.return_value = fake_doc
+            pages = analyze.collect_pages(tmp_path, tmp_path / "thumbs", ocr_strategy="roi")
+
+        assert any("ROI抽出テキスト" in p.get("text", "") for p in pages)

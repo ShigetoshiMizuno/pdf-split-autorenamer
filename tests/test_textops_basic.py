@@ -43,6 +43,13 @@ class TestFixBrokenUnicode:
         result = fix_broken_unicode("€")
         assert isinstance(result, str)  # returns unchanged "€"
 
+    def test_broken_char_that_does_not_produce_japanese(self):
+        # "ç" is in _BROKEN_UNICODE_CHARS → passes early return check.
+        # "ç".encode("cp1252") = b"\xe7" which is invalid UTF-8 alone → UnicodeDecodeError.
+        # Decoded with replace → no Japanese → all encodings fail → return s (lines 64-65, 68).
+        result = fix_broken_unicode("ç")
+        assert result == "ç"  # unchanged, no Japanese found
+
 
 class TestExtractDatesAll:
     def test_iso_format(self):
