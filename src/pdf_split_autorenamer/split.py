@@ -60,7 +60,7 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     groups_path = work_dir / "groups.json"
     if not groups_path.exists():
-        raise FileNotFoundError(f"groups.json not found: {groups_path}")
+        raise FileNotFoundError(f"groups.json が見つかりません: {groups_path}")
 
     raw = json.loads(groups_path.read_text(encoding="utf-8"))
     groups = normalize_groups(raw)
@@ -90,8 +90,8 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
         for idx, it in enumerate(items, start=1):
             a, b = it["range"]
             if a < 1 or b > page_count or a > b:
-                logging.warning(
-                    "out-of-range group skipped: %s pages %s-%s", pdf_name, a, b
+                logger.warning(
+                    "範囲外グループをスキップします: %s ページ %s-%s", pdf_name, a, b
                 )
                 summary["actions"].append({
                     "src": pdf_name, "range": [a, b],
@@ -120,7 +120,7 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
                     summary["files_written"] += 1
                     summary["total_output_pages"] += (b - a + 1)
                 except Exception as e:
-                    logging.error("failed to write %s: %s", out_name, e)
+                    logger.error("書き込みに失敗しました %s: %s", out_name, e)
                     action["status"] = f"error: {e}"
             summary["actions"].append(action)
 

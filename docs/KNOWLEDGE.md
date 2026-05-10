@@ -1,6 +1,6 @@
 # pdf-split-autorenamer 技術メモ・知見集
 
-最終更新: 2026-05-10
+最終更新: 2026-05-11
 
 本ドキュメントは開発中に判明した技術的知見・落とし穴・設計判断の根拠をまとめたものです。
 コードの動作を変更する際は必ず本ドキュメントを参照し、矛盾しないか確認してください。
@@ -23,6 +23,7 @@ ScanSnap（S500 等）はスキャン時に自前の OCR エンジンでテキ�
 | `紁` | `旨` | 「要紁」 | メッセージ要旨の「旨」 |
 | `迁` | `迎` | 「歓迁」 | 歓迎の「迎」 |
 | `曁` | `曜` | 「水曁日」 | 曜日の「曜」 |
+| `歎` / `藪` / `裁` / `鐵` / `欽` | `歓` | 「歎迎」「藪迎」等 | 歓の異体字様誤読（T-04 で追加） |
 
 ### 孤立 E の問題
 
@@ -39,7 +40,7 @@ s = re.sub(r"(?<=[一-鿿])E(?=[^A-Za-z0-9])", "", s)
 
 - `MOJIBAKE_FIX` マップは ScanSnap S500 でのみ確認したパターン。機種・ファームウェアが異なると別の化けが生じる可能性がある
 - 化け修復は「置換」なので、偶然その文字が正しく使われているケースには誤修復のリスクがある（実用上は問題ないと判断済み）
-- 修復マップの拡張は v0.2 以降に外部定義対応を検討（TODO T-04）
+- 外部 TOML 対応は **T-04 で実装済み**。`profiles/scansnap-s500.toml` が標準の ScanSnap S500 用マップを提供しており、`fix_mojibake(s, extra_map=load_mojibake_map(path))` で追加マップを合成できる
 
 ---
 
@@ -67,10 +68,9 @@ PyMuPDF 内部の ANSI 変換を回避できる。
 
 ### 注意点
 
-- `fitz.open(pdf_path)` の入力パスにも同じ問題が潜在しており、**現時点では出力側のみが対処済み**で入力側は未対処。これは技術的負債で、Issue #6 / TODO T-00 で v0.2 中に解消する予定。
-  - 暫定回避: `fitz.open(stream=path.read_bytes(), filetype="pdf")` を使えばバイト経由で読み込める
+- `fitz.open()` の入力パス問題は **T-00 で解消済み**。`pdfio.py` / `analyze.py` / `split.py` 内のすべての `fitz.open()` を `fitz.open(stream=path.read_bytes(), filetype="pdf")` のバイト経由に統一した
 - PyMuPDF のバージョンを上げる際は必ず Windows + 日本語パスで動作確認すること
-- `pyproject.toml` で PyMuPDF バージョンを `>=1.23,<1.26` 程度に固定することを推奨（v0.2 で実施予定）
+- `pyproject.toml` で PyMuPDF バージョンを `>=1.23,<1.26` に固定済み（T-00 で実施）
 
 ---
 
@@ -117,7 +117,7 @@ for enc in ("cp1252", "latin-1"):
 - ファイル名が化けた状態でも `src.rename(dst)` は OS レベルで行えるので、
   表示上の化け修復とファイル操作は独立している
 - **誤判定リスク**: 復元の発動条件は「結果が日本語文字を含む」のみ。理論上、英語ファイル名の cp1252 バイト列を UTF-8 として誤解釈した結果、偶然日本語と判定されるケースが起こりうる（実用上は極稀）。逆に、復元すべきだが結果に日本語を含まない（記号のみなど）ケースは復元されない。
-  - v0.2 以降の改善案: 元文字列に「典型的化け文字（`ç`, `å`, `ï`, `»`, `Ã` など）」が含まれる場合のみ復元を試みる事前チェックを追加
+  - **v0.2 実装済み**: `_BROKEN_UNICODE_CHARS`（`ç, å, ï, Ã` など）が含まれる場合のみ復元を試みる事前チェックを追加。これにより英語ファイル名への誤適用を防止している。
 
 ---
 
@@ -193,21 +193,18 @@ TITLE_MARKER_RE = re.compile(
 号数・巻数・年号・月日の出現は「新しい書類の冒頭」を強く示す。
 教会の週報は「第 NNN 号」「令和 N 年 M 月」のような表記を持つことが多い。
 
-#### 画像ハッシュ（phash）— 有効性: 低（連続スキャンでは使えない）
+#### 画像ハッシュ（phash）— 有効性: 低（連続スキャンでは使えない）→ **削除済み（T-07b）**
 
-**実装は存在するが（`avg_phash()`, `hamming()`）、`score_boundary()` では境界判定に使われていない。**
+**`avg_phash()` および `hamming()` 関数は T-07b で `analyze.py` から削除された。**
 
-理由:
+削除の理由:
 - 連続スキャンでは同一書類の複数ページも「別々の画像」であり、ハッシュ差が大きくなる
 - 書類 A の最終ページと書類 B の先頭ページの間に特別なハッシュ類似度の変化は生じない
 - 書類内でも図表のあるページとないページではハッシュ差が大きく、誤検知の原因になる
-
-phash は「同一ページの重複検出」（スキャン済み→再スキャン判定等）には有効だが、
-書類グループの境界判定には適していない。
+- `score_boundary()` では境界判定に使われておらず、計算コストのみが発生していた
 
 サムネイル生成には引き続き PyMuPDF の `render_thumb()` を使っており、
-HTML レポートで人間が目視確認するための表示用途に限定している。
-将来 phash の用途がなければ `collect_pages()` での計算をスキップしてもよい（軽量化）。
+HTML レポートで人間が目視確認するための表示用途（JPEG 保存）には影響なし。
 
 ### 境界スコアの調整
 
@@ -243,69 +240,83 @@ cp932 になることがある。`cli.py` の冒頭で `sys.stdout.reconfigure(e
 呼んでいるが、リダイレクト先（ファイル等）では効かない場合がある。
 `PYTHONIOENCODING=utf-8` を環境変数に設定することを README に記載すること（TODO T-12）。
 
-### `_KEEP_CHARS` 未使用問題
+### `_KEEP_CHARS` 未使用問題 — **解消済み（T-04b）**
 
-`textops.py` に `_KEEP_CHARS` 正規表現が定義されているが、`sanitize_filename()` 内で
-参照されていない。サニタイズは `_INVALID_NAME` による禁止文字除去のみで動作している。
-これは設計意図の取り違えか、実装途上の残骸の可能性がある（TODO T-04b 参照）。
-
----
-
-## 7. Python 3.11 editable install での `__main__` サブモジュール非表示問題
-
-### 症状
-
-```python
-from pdf_split_autorenamer.__main__ import main
-# → ModuleNotFoundError: No module named 'pdf_split_autorenamer.__main__'
-```
-
-### 原因
-
-setuptools による editable install（`pip install -e .`）では、Python 3.11 で
-`__main__.py` がサブモジュールとして `sys.modules` に登録されない場合がある。
-Python 3.12 では正常に動作する。
-
-### 対処
-
-`__main__.py` を直接インポートするテストを削除し、未カバーとして受け入れる。
-カバレッジは 99%+（`__main__.py` の 3 statements のみ）。
-
-`python -m pdf_split_autorenamer` としての動作自体は問題ない。
-
-### 参考
-
-- CI は Python 3.11 を使用中（GitHub Actions, ubuntu-latest / windows-latest）
-- Python 3.12 ではこの問題は発生しない
+`textops.py` に `_KEEP_CHARS` 正規表現が定義されていたが、`sanitize_filename()` 内で
+参照されておらず、実装途上の残骸だった。T-04b でこの未使用定義を削除した。
+サニタイズは `_INVALID_NAME` による禁止文字除去のみで行われており、動作に変更なし。
 
 ---
 
-## 8. テストで発見した到達不能ブランチ
+## 8. テスト戦略・カバレッジ知見
 
-### textops.py L70: `extract_dates_all()` の `seen_positions` チェック
+### 達成状況（2026-05-11 時点）
+
+- **429 テスト、全体 100%**（1052/1052 statements）
+- feature/v1.0-ux ブランチ（PR #12）にて達成
+
+### Tkinter GUI のテスト方法
+
+`gui.py`（`App(tk.Tk)` サブクラス）を headless 環境でテストするために以下の戦略を使用：
+
+1. **`App.__init__` をモック + 属性を手動注入**（`test_gui_profile.py` / `test_gui_extra.py`）
+   ```python
+   with patch.object(gui_module.App, "__init__", return_value=None):
+       app = gui_module.App()
+   app.__dict__.update({"folder_var": _StringVar(), ...})
+   ```
+
+2. **`ttk` / `tk` を MagicMock に置換して `_build_ui` を実行**
+   - `patch.object(gui_module, "ttk", MagicMock())` でウィジェット生成を無害化
+   - `logging.getLogger` もモックしてハンドラ登録を防ぐ
+
+3. **`if __name__ == "__main__"` ガードの実行**（line 375）
+   - `runpy.run_module("pdf_split_autorenamer.gui", run_name="__main__")` は fresh namespace を使うため `patch("gui.App")` が効かない
+   - 解決策: `tkinter.Tk` / `tkinter.ttk.*` を直接パッチしてから `runpy.run_module` を呼ぶ
+
+4. **`_run_async`（スレッド）のテスト**
+   - `patch.object(app, "after", side_effect=lambda delay, fn, *a: fn(*a))` で `after()` を同期的に実行
+   - `threading.Event` で非同期完了を待機（`event.wait(timeout=3)`）
+
+### `importlib.reload` を使うモジュールレベルコードのカバレッジ
 
 ```python
-for pat in _DATE_PATTERNS:
-    for m in pat.finditer(t):
-        if m.start() in seen_positions:  # L70: ここは現在到達不能
-            continue
+# cli.py lines 13-14: stdout.reconfigure の例外握り潰し
+import importlib
+sys.stdout.reconfigure = lambda encoding: raise_exception()
+importlib.reload(cli_mod)
+# ← reload 後は必ず restore すること
 ```
 
-現在の 4 つのパターン（日本語/ドット/スラッシュ/ダッシュ）は
-正規化後のテキストに対して同一位置でマッチすることがない（分離した文字クラスのため）。
-`seen_positions` は将来パターンを追加したときのための防衛的コードとして維持する。
-カバレッジ計測では「到達不能」として 99% で固定される。
-
-### pdfio.py L109: `avg_phash()` のサンプル数パディング
+### `runpy.run_module` で `if __name__ == "__main__"` をカバー
 
 ```python
-if len(samples) < 64:
-    samples = samples + [0] * (64 - len(samples))
+with patch("sys.argv", ["psar", "analyze", str(tmp_path)]):
+    with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
+        with pytest.raises(SystemExit):
+            runpy.run_module("pdf_split_autorenamer.cli", run_name="__main__")
 ```
 
-PyMuPDF が強制する最小ページサイズ（1pt × 1pt）では
-`zoom = 8/max(1, 1) = 8` となり、ピクスマップは 8×8 = 64 サンプルになる。
-実際のPDFでは 64 未満になることはほぼない（防衛的コードとして維持）。
+注意: 既存モジュールを再実行するため `RuntimeWarning` が出ることがある（無害）。
+
+### 実質的に到達不可能な行
+
+以下は実環境テストでは到達できないが、上記テクニックでカバー：
+- `cli.py` lines 13-14: `sys.stdout.reconfigure` が失敗する環境（一部 IDLE / embedded Python）
+- `textops.py` lines 10-14: Python < 3.11 の tomllib 代替インポートチェーン
+- `gui.py` line 375: `if __name__ == "__main__"` ガード（直接スクリプト実行のみ）
+
+### Python 3.11 editable install で `__main__` サブモジュールが見えない
+
+`from pdf_split_autorenamer.__main__ import main` は Python 3.12 では動くが、
+Python 3.11 + setuptools editable install 環境では
+`ModuleNotFoundError: No module named 'pdf_split_autorenamer.__main__'` になる。
+
+**原因**: Python 3.11 の setuptools editable finder が `__main__` を特殊名として除外している。
+
+**対処**: テストを削除し、`__main__.py` line 6 (`raise SystemExit(main())`) の
+1 statement は未カバーとして受け入れる（総カバレッジ 99%）。
+CI を 3.12 に切り替えれば解消するが、3.11 サポートを続ける限りはこの制限が残る。
 
 ---
 

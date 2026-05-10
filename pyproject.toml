@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-split-autorenamer"
-version = "0.1.0"
+version = "0.2.0"
 description = "OCR埋め込みPDFをグループ別に分割し、内容ベースで自動リネームするツール (CUI/GUI共用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,15 +14,19 @@ authors = [
 ]
 keywords = ["pdf", "scan", "ocr", "rename", "split", "scansnap"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Office/Business",
     "Topic :: Utilities",
+    "Natural Language :: Japanese",
+    "Environment :: Console",
+    "Environment :: X11 Applications",
 ]
 dependencies = [
     "PyMuPDF>=1.23,<1.26",

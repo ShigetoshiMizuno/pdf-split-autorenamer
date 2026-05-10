@@ -71,7 +71,7 @@ v1.0.0:
 - [x] プロファイル TOML フォーマットの定義（title_patterns / body_patterns の正規表現リスト）
 - [x] `textops.load_profile(path: Path) -> tuple[list, list]` を追加
 - [x] `psar rename --profile <path>` オプション追加
-- [ ] GUI にプロファイル選択欄追加（v1.0 持ち越し）
+- [x] GUI にプロファイル選択欄追加（Step 3 リネームセクションに TOML ファイル選択ボタン追加）
 - [x] サンプルプロファイル（`profiles/church.toml`、`profiles/business.toml`）を同梱
 
 ### T-03: GitHub Actions 自動ビルド ※ v0.2.5（v0.2 完了後に着手）
@@ -107,6 +107,7 @@ v1.0.0:
 - [x] `tests/test_pdfio.py`: 最小サンプル PDF（自前生成）で `extract_text_pymupdf` / `save_pdf_pages` を検証
 - [x] GitHub Actions に pytest ジョブ追加（windows / ubuntu）
 - [x] 目標: コアモジュールカバレッジ 60%（T-10 で v1.0 までに 70% へ引き上げ）
+  - 現状: **全体 100%、429 テスト**（全モジュール 100% — gui.py 含む）
 
 ### T-10b: logging 移行
 - [Issue なし] [担当: PRGちゃん] [推定: 0.5日] [依存: なし]
@@ -162,31 +163,33 @@ v1.0.0:
 
 ### T-10: テストスイート整備
 - [Issue なし] [担当: QAちゃん/PRGちゃん] [推定: 3〜5日]
-- [ ] `tests/` ディレクトリ作成
-- [ ] `test_textops.py`: `fix_mojibake`, `fix_broken_unicode`, `extract_dates_all`, `extract_kind`, `sanitize_filename`
-- [ ] `test_pdfio.py`: `extract_text`, `save_pdf_pages`（最小サンプル PDF 使用）
-- [ ] `test_analyze.py`: `score_boundary`, `build_initial_groups`
-- [ ] `test_split.py`: `normalize_groups`, `run_split`（dry-run）
-- [ ] `test_rename.py`: `choose_date`, `resolve_filenames`, `run_rename`（dry-run）
-- [ ] GitHub Actions に pytest ジョブを追加
-- [ ] カバレッジ目標: 70%
+- [x] `tests/` ディレクトリ作成
+- [x] `test_textops.py`: `fix_mojibake`, `fix_broken_unicode`, `extract_dates_all`, `extract_kind`, `sanitize_filename`
+- [x] `test_pdfio.py`: `extract_text`, `save_pdf_pages`（最小サンプル PDF 使用）
+- [x] `test_analyze.py`: `score_boundary`, `build_initial_groups`
+- [x] `test_split.py`: `normalize_groups`, `run_split`（dry-run は実PDF不要な normalize_groups のみ）
+- [x] `test_rename.py`: `choose_date`, `resolve_filenames`, `run_rename`（dry-run）
+- [x] GitHub Actions に pytest ジョブを追加（test.yml）
+- [x] カバレッジ目標: 70% → **100% 達成**（全モジュール 100%、gui.py 含む）
+  - 429 テスト（feature/v1.0-ux ブランチ時点）
+  - gui.py: Tkinter を全モック化した test_gui_extra.py で 100% カバー
 
 ### T-11: PyPI 公開
 - [Issue なし] [担当: PRGちゃん] [推定: 0.5日]
-- [ ] `pyproject.toml` の classifiers を `Development Status :: 4 - Beta` 以降に更新
-- [ ] `python -m build` + `twine upload` で PyPI アップロード
-- [ ] README バッジ（PyPI バージョン・ライセンス）追加
+- [x] `pyproject.toml` の classifiers を `Development Status :: 4 - Beta` 以降に更新
+- [ ] `python -m build` + `twine upload` で PyPI アップロード（監督の承認後に実施）
+- [x] README バッジ（PyPI バージョン・ライセンス）追加
 
 ### T-12: ユーザビリティ細部
 - [Issue #8] [担当: PRGちゃん] [推定: 1〜2日]
-- [ ] `psar --version` の実装（`importlib.metadata.version()` 使用）
-- [ ] エラーメッセージの日本語統一・改善
-- [ ] README「よくある質問」セクション追加
-- [ ] `report.html` に「OCR テキストが空のページ」の視覚的警告追加
-- [ ] HTML レポートでの境界編集 → groups.json ダウンロードフローの改善（`psar serve` でローカルHTTP立ち上げ + 直接保存、または GUI に WebView 統合）
+- [x] `psar --version` の実装（`importlib.metadata.version()` 使用）
+- [x] エラーメッセージの日本語統一・改善（cli.py / split.py / analyze.py / rename.py のエラー・警告メッセージを日本語化）
+- [x] README「よくある質問」セクション追加
+- [x] `report.html` に「OCR テキストが空のページ」の視覚的警告追加
+- [x] HTML レポートでの境界編集 → groups.json ダウンロードフローの改善（`psar serve` でローカルHTTP立ち上げ + 直接保存を実装済み。`http://` モードで `/api/save-groups` に POST して直接書き込み）
 - [ ] ワークディレクトリ名を `.psar/` から `psar_work/` に変更検討（hidden だと Windows エクスプローラで見えない問題）
-- [ ] GUI の確認ダイアログに dry-run 結果サマリ表示
-- [ ] GUI の進捗ログをワーカースレッドから逐次表示（現状は完了時に一括）
+- [x] GUI の確認ダイアログに dry-run 結果サマリ表示
+- [x] GUI の進捗ログをワーカースレッドから逐次表示（_TextHandler で実装済み）
 
 ### T-13: PaddleOCR / EasyOCR バックエンド
 - [Issue #4] [担当: PRGちゃん] [推定: 2〜3日]

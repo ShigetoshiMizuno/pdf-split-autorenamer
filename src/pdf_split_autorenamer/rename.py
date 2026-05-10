@@ -66,7 +66,7 @@ def fallback_title(hint_filename: str) -> str:
     if not name:
         return ""
     name = re.sub(r"\d{4}-\d{1,2}-\d{1,2}_?", "", name)
-    name = re.sub(r"[�-ÿ]", "", name)  # U+FFFD と Latin-1 残骸を除去
+    name = "".join(c for c in name if not (0x80 <= ord(c) <= 0xFF or ord(c) == 0xFFFD))
     name = name.strip("_ ")
     return name[:30]
 
@@ -201,7 +201,7 @@ def run_rename(src_dir: Path, mode: str = "split", apply: bool = False,
                 action["status"] = "ok"
                 applied += 1
             except Exception as e:
-                logging.error("failed to rename %s: %s", src.name, e)
+                logging.error("リネームに失敗しました %s: %s", src.name, e)
                 action["status"] = f"error: {e}"
         else:
             action["status"] = "dry-run"

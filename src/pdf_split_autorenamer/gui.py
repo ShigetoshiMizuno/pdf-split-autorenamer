@@ -48,6 +48,7 @@ class App(tk.Tk):
         self.folder_var = tk.StringVar(value=initial_folder or "")
         self.rename_mode_var = tk.StringVar(value="split")
         self.force_var = tk.BooleanVar(value=False)
+        self.profile_var = tk.StringVar()
 
         self._build_ui()
 
@@ -85,14 +86,28 @@ class App(tk.Tk):
         # Step 3: リネーム
         f3 = ttk.LabelFrame(body, text="3. 自動リネーム（内容ベース）", padding=8)
         f3.pack(fill="x", **pad)
-        ttk.Radiobutton(f3, text="分割直後", variable=self.rename_mode_var,
+
+        # Step 3 上段: モード選択 + 実行ボタン
+        f3_row1 = ttk.Frame(f3)
+        f3_row1.pack(fill="x")
+        ttk.Radiobutton(f3_row1, text="分割直後", variable=self.rename_mode_var,
                         value="split").pack(side="left")
-        ttk.Radiobutton(f3, text="日付不明_を再考", variable=self.rename_mode_var,
+        ttk.Radiobutton(f3_row1, text="日付不明_を再考", variable=self.rename_mode_var,
                         value="unknown").pack(side="left", padx=8)
-        ttk.Radiobutton(f3, text="両方", variable=self.rename_mode_var,
+        ttk.Radiobutton(f3_row1, text="両方", variable=self.rename_mode_var,
                         value="all").pack(side="left", padx=8)
-        ttk.Button(f3, text="dry-run", command=lambda: self._on_rename(False)).pack(side="left", padx=12)
-        ttk.Button(f3, text="実行", command=lambda: self._on_rename(True)).pack(side="left", padx=4)
+        ttk.Button(f3_row1, text="dry-run", command=lambda: self._on_rename(False)).pack(side="left", padx=12)
+        ttk.Button(f3_row1, text="実行", command=lambda: self._on_rename(True)).pack(side="left", padx=4)
+
+        # Step 3 下段: プロファイル TOML 選択
+        f3_row2 = ttk.Frame(f3)
+        f3_row2.pack(fill="x", pady=(4, 0))
+        ttk.Label(f3_row2, text="プロファイル:").pack(side="left")
+        ttk.Entry(f3_row2, textvariable=self.profile_var, state="readonly").pack(
+            side="left", fill="x", expand=True, padx=(6, 6))
+        ttk.Button(f3_row2, text="参照…", command=self._on_browse_profile).pack(side="left")
+        ttk.Button(f3_row2, text="クリア",
+                   command=lambda: self.profile_var.set("")).pack(side="left", padx=(4, 0))
 
         # ログエリア
         log_frame = ttk.LabelFrame(self, text="ログ", padding=4)
@@ -120,6 +135,14 @@ class App(tk.Tk):
         if d:
             self.folder_var.set(d)
 
+    def _on_browse_profile(self) -> None:
+        path = filedialog.askopenfilename(
+            title="プロファイル TOML を選択",
+            filetypes=[("TOML ファイル", "*.toml"), ("すべてのファイル", "*.*")],
+        )
+        if path:
+            self.profile_var.set(path)
+
     def _get_folder(self) -> Path | None:
         v = self.folder_var.get().strip()
         if not v:
@@ -145,12 +168,53 @@ class App(tk.Tk):
             try:
                 result = target()
             except Exception as e:
-                self._log(f"ERROR: {e}")
-                self._set_status("エラー")
+                self.after(0, self._log, f"ERROR: {e}")
+                self.after(0, self._set_status, "エラー")
                 return
             if on_done:
                 self.after(0, lambda: on_done(result))
         threading.Thread(target=worker, daemon=True).start()
+
+    # ----- サマリ組み立て -----
+    @staticmethod
+    def _build_split_summary(res: dict) -> str:
+        actions = res.get("actions", [])
+        files_written = res.get("files_written", 0)
+        total_output_pages = res.get("total_output_pages", 0)
+        lines = [f"書き出し予定: {files_written} ファイル / {total_output_pages} ページ", ""]
+        limit = 10
+        for a in actions[:limit]:
+            st = a.get("status", "")
+            out = a.get("out", a.get("src", ""))
+            rng = a.get("range", "?")
+            lines.append(f"  [{st}] {out}  pages {rng}")
+        if len(actions) > limit:
+            lines.append(f"  … 他 {len(actions) - limit} 件")
+        lines.append("")
+        lines.append("実行してよろしいですか？")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _build_rename_summary(res: dict, mode: str) -> str:
+        actions = res.get("actions", [])
+        targets = res.get("targets", 0)
+        lines = [f"対象: {targets} 件 (モード: {mode})", ""]
+        limit = 10
+        for a in actions[:limit]:
+            status = a.get("status", "")
+            old = a.get("src_display", a.get("src", ""))
+            dst = a.get("dst", "")
+            date = a.get("date") or "----"
+            kind = a.get("kind", "")
+            if status == "skip":
+                lines.append(f"  [skip]   {old}  ->  既存ファイルあり")
+            else:
+                lines.append(f"  [{status}] {old}  ->  {dst}  [{date} / {kind}]")
+        if len(actions) > limit:
+            lines.append(f"  … 他 {len(actions) - limit} 件")
+        lines.append("")
+        lines.append("実行してよろしいですか？")
+        return "\n".join(lines)
 
     # ----- アクション -----
     def _on_analyze(self) -> None:
@@ -191,53 +255,114 @@ class App(tk.Tk):
         folder = self._get_folder()
         if not folder:
             return
-        if apply_ and not messagebox.askyesno("確認", "分割を実行します。よろしいですか？"):
-            return
-        self._log(f"=== 分割 ({'実行' if apply_ else 'dry-run'}) ===")
-        self._set_status("分割中…")
         force = self.force_var.get()
 
-        def do():
-            return _split.run_split(folder, dry_run=not apply_, force=force)
+        if not apply_:
+            # dry-run ボタン: ログに流すだけ（既存動作を維持）
+            self._log("=== 分割 dry-run ===")
+            self._set_status("dry-run 中…")
 
-        def done(res):
-            for a in res["actions"]:
-                st = a.get("status", "")
-                self._log(f"  [{st}] {a.get('out', a.get('src', ''))}  pages {a.get('range', '?')}")
-            self._log(f"  入力ページ合計: {res['total_input_pages']}")
-            if apply_:
-                self._log(f"  書き出し: {res['files_written']} ファイル / {res['total_output_pages']} ページ")
-                self._log(f"  スキップ: {res['files_skipped']} ファイル")
-            self._set_status("分割完了" if apply_ else "dry-run 完了")
+            def do_dry():
+                return _split.run_split(folder, dry_run=True, force=force)
 
-        self._run_async(do, done)
+            def done_dry(res):
+                for a in res["actions"]:
+                    st = a.get("status", "")
+                    self._log(f"  [{st}] {a.get('out', a.get('src', ''))}  pages {a.get('range', '?')}")
+                self._log(f"  入力ページ合計: {res['total_input_pages']}")
+                self._set_status("dry-run 完了")
+
+            self._run_async(do_dry, done_dry)
+            return
+
+        # 実行ボタン: まず dry-run してサマリを確認ダイアログに表示
+        self._log("=== 分割 dry-run (確認中…) ===")
+        self._set_status("確認中…")
+
+        def do_preview():
+            return _split.run_split(folder, dry_run=True, force=force)
+
+        def done_preview(res):
+            summary = self._build_split_summary(res)
+            if not messagebox.askyesno("分割の確認", summary):
+                self._set_status("キャンセル")
+                return
+            # 本番実行
+            self._log("=== 分割 実行 ===")
+            self._set_status("分割中…")
+
+            def do_apply():
+                return _split.run_split(folder, dry_run=False, force=force)
+
+            def done_apply(res2):
+                for a in res2["actions"]:
+                    st = a.get("status", "")
+                    self._log(f"  [{st}] {a.get('out', a.get('src', ''))}  pages {a.get('range', '?')}")
+                self._log(f"  入力ページ合計: {res2['total_input_pages']}")
+                self._log(f"  書き出し: {res2['files_written']} ファイル / {res2['total_output_pages']} ページ")
+                self._log(f"  スキップ: {res2['files_skipped']} ファイル")
+                self._set_status("分割完了")
+
+            self._run_async(do_apply, done_apply)
+
+        self._run_async(do_preview, done_preview)
 
     def _on_rename(self, apply_: bool) -> None:
         folder = self._get_folder()
         if not folder:
             return
         mode = self.rename_mode_var.get()
-        if apply_ and not messagebox.askyesno(
-            "確認",
-            f"リネームを実行します（モード: {mode}）。よろしいですか？\nファイル名は元に戻せます（手動で）。"
-        ):
+        profile_str = self.profile_var.get()
+        profile = Path(profile_str) if profile_str else None
+
+        if not apply_:
+            # dry-run ボタン: ログに流すだけ（既存動作を維持）
+            self._log(f"=== リネーム dry-run (mode={mode}) ===")
+            self._set_status("dry-run 中…")
+
+            def do_dry():
+                return _rename.run_rename(folder, mode=mode, apply=False, profile=profile)
+
+            def done_dry(res):
+                self._log(f"  対象: {res['targets']} 件")
+                for a in res["actions"]:
+                    old = a.get("src_display", a["src"])
+                    self._log(f"  [{a['status']:8}] {old}  ->  {a['dst']}  [{a.get('date') or '----'} / {a.get('kind', '')}]")
+                self._set_status("dry-run 完了")
+
+            self._run_async(do_dry, done_dry)
             return
-        self._log(f"=== リネーム ({'実行' if apply_ else 'dry-run'}, mode={mode}) ===")
-        self._set_status("リネーム中…")
 
-        def do():
-            return _rename.run_rename(folder, mode=mode, apply=apply_)
+        # 実行ボタン: まず dry-run してサマリを確認ダイアログに表示
+        self._log(f"=== リネーム dry-run (確認中…, mode={mode}) ===")
+        self._set_status("確認中…")
 
-        def done(res):
-            self._log(f"  対象: {res['targets']} 件")
-            for a in res["actions"]:
-                old = a.get("src_display", a["src"])
-                self._log(f"  [{a['status']:8}] {old}  ->  {a['dst']}  [{a.get('date') or '----'} / {a.get('kind', '')}]")
-            if apply_:
-                self._log(f"  リネーム完了: {res['applied']} 件")
-            self._set_status("リネーム完了" if apply_ else "dry-run 完了")
+        def do_preview():
+            return _rename.run_rename(folder, mode=mode, apply=False, profile=profile)
 
-        self._run_async(do, done)
+        def done_preview(res):
+            summary = self._build_rename_summary(res, mode)
+            if not messagebox.askyesno("リネームの確認", summary):
+                self._set_status("キャンセル")
+                return
+            # 本番実行
+            self._log(f"=== リネーム 実行 (mode={mode}) ===")
+            self._set_status("リネーム中…")
+
+            def do_apply():
+                return _rename.run_rename(folder, mode=mode, apply=True, profile=profile)
+
+            def done_apply(res2):
+                self._log(f"  対象: {res2['targets']} 件")
+                for a in res2["actions"]:
+                    old = a.get("src_display", a["src"])
+                    self._log(f"  [{a['status']:8}] {old}  ->  {a['dst']}  [{a.get('date') or '----'} / {a.get('kind', '')}]")
+                self._log(f"  リネーム完了: {res2['applied']} 件")
+                self._set_status("リネーム完了")
+
+            self._run_async(do_apply, done_apply)
+
+        self._run_async(do_preview, done_preview)
 
 
 def main(initial_folder: str | None = None) -> int:
