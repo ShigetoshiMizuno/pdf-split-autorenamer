@@ -288,7 +288,7 @@ class TestLoadProfileTomllibNone:
     def test_raises_import_error_when_tomllib_none(self, tmp_path):
         """tomllib が None のとき ImportError を送出する（line 191）"""
         dummy = tmp_path / "dummy.toml"
-        dummy.write_bytes(b"")
+        dummy.write_text("", encoding="utf-8")
         with patch("pdf_split_autorenamer.textops.tomllib", None):
             with pytest.raises(ImportError, match="TOML"):
                 load_profile(dummy)
@@ -298,7 +298,81 @@ class TestLoadMojibakeMapTomllibNone:
     def test_raises_import_error_when_tomllib_none(self, tmp_path):
         """tomllib が None のとき ImportError を送出する（line 218）"""
         dummy = tmp_path / "dummy.toml"
-        dummy.write_bytes(b"")
+        dummy.write_text("", encoding="utf-8")
         with patch("pdf_split_autorenamer.textops.tomllib", None):
             with pytest.raises(ImportError, match="TOML"):
                 load_mojibake_map(dummy)
+
+
+# ---------------------------------------------------------------------------
+# load_profile / load_mojibake_map — 実 TOML ファイルを使った統合テスト
+# ---------------------------------------------------------------------------
+
+class TestLoadProfileIntegration:
+    def test_load_church_toml(self):
+        """church.toml を読み込んで title_patterns / body_patterns を返す"""
+        profiles_dir = Path(__file__).parent.parent / "profiles"
+        church_toml = profiles_dir / "church.toml"
+        if not church_toml.exists():
+            pytest.skip("church.toml が見つかりません")
+        title_patterns, body_patterns = load_profile(church_toml)
+        assert len(title_patterns) > 0
+        assert len(body_patterns) > 0
+
+    def test_load_profile_patterns_work_with_extract_kind(self):
+        """load_profile で取得したパターンが extract_kind で正しく機能する"""
+        profiles_dir = Path(__file__).parent.parent / "profiles"
+        church_toml = profiles_dir / "church.toml"
+        if not church_toml.exists():
+            pytest.skip("church.toml が見つかりません")
+        title_patterns, body_patterns = load_profile(church_toml)
+        result = extract_kind("週報\n2026年4月6日", title_patterns=title_patterns,
+                              body_patterns=body_patterns)
+        assert result == "週報"
+
+    def test_load_profile_from_toml_content(self, tmp_path):
+        """TOML コンテンツを直接書いてプロファイルを読み込む"""
+        toml_content = (
+            '[[title_patterns]]\n'
+            'pattern = "test-doc"\n'
+            'label = "TestDoc"\n'
+            '\n'
+            '[[body_patterns]]\n'
+            'pattern = "body-test"\n'
+            'label = "BodyKind"\n'
+        )
+        toml_path = tmp_path / "test.toml"
+        toml_path.write_text(toml_content, encoding="utf-8")
+        title_patterns, body_patterns = load_profile(toml_path)
+        assert len(title_patterns) == 1
+        assert len(body_patterns) == 1
+        assert title_patterns[0][1] == "TestDoc"
+        assert body_patterns[0][1] == "BodyKind"
+
+
+class TestLoadMojibakeMapIntegration:
+    def test_load_scansnap_s500_toml(self):
+        """scansnap-s500.toml を読み込んで置換マップを返す"""
+        profiles_dir = Path(__file__).parent.parent / "profiles"
+        scansnap_toml = profiles_dir / "scansnap-s500.toml"
+        if not scansnap_toml.exists():
+            pytest.skip("scansnap-s500.toml が見つかりません")
+        result = load_mojibake_map(scansnap_toml)
+        assert isinstance(result, dict)
+        assert len(result) > 0
+
+    def test_load_mojibake_map_from_toml_content(self, tmp_path):
+        """TOML コンテンツを直接書いてマップを読み込む"""
+        toml_content = (
+            '[[replacements]]\n'
+            'wrong = "X"\n'
+            'correct = "Y"\n'
+            '\n'
+            '[[replacements]]\n'
+            'wrong = "A"\n'
+            'correct = "B"\n'
+        )
+        toml_path = tmp_path / "test.toml"
+        toml_path.write_text(toml_content, encoding="utf-8")
+        result = load_mojibake_map(toml_path)
+        assert result == {"X": "Y", "A": "B"}
