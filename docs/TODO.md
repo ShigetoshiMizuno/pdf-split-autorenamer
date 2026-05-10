@@ -179,14 +179,14 @@ v1.0.0:
 
 ### T-12: ユーザビリティ細部
 - [Issue #8] [担当: PRGちゃん] [推定: 1〜2日]
-- [ ] `psar --version` の実装（`importlib.metadata.version()` 使用）
+- [x] `psar --version` の実装（`importlib.metadata.version()` 使用）
 - [ ] エラーメッセージの日本語統一・改善
-- [ ] README「よくある質問」セクション追加
-- [ ] `report.html` に「OCR テキストが空のページ」の視覚的警告追加
+- [x] README「よくある質問」セクション追加
+- [x] `report.html` に「OCR テキストが空のページ」の視覚的警告追加
 - [ ] HTML レポートでの境界編集 → groups.json ダウンロードフローの改善（`psar serve` でローカルHTTP立ち上げ + 直接保存、または GUI に WebView 統合）
 - [ ] ワークディレクトリ名を `.psar/` から `psar_work/` に変更検討（hidden だと Windows エクスプローラで見えない問題）
-- [ ] GUI の確認ダイアログに dry-run 結果サマリ表示
-- [ ] GUI の進捗ログをワーカースレッドから逐次表示（現状は完了時に一括）
+- [x] GUI の確認ダイアログに dry-run 結果サマリ表示
+- [x] GUI の進捗ログをワーカースレッドから逐次表示（_TextHandler で実装済み）
 
 ### T-13: PaddleOCR / EasyOCR バックエンド
 - [Issue #4] [担当: PRGちゃん] [推定: 2〜3日]
