@@ -13,7 +13,7 @@ from pathlib import Path
 
 try:
     import tomllib
-except ImportError:
+except ImportError:  # pragma: no cover
     try:
         import tomli as tomllib  # type: ignore[no-reattr-module]
     except ImportError:
