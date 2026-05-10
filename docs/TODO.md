@@ -183,7 +183,7 @@ v1.0.0:
 - [ ] エラーメッセージの日本語統一・改善
 - [x] README「よくある質問」セクション追加
 - [x] `report.html` に「OCR テキストが空のページ」の視覚的警告追加
-- [ ] HTML レポートでの境界編集 → groups.json ダウンロードフローの改善（`psar serve` でローカルHTTP立ち上げ + 直接保存、または GUI に WebView 統合）
+- [x] HTML レポートでの境界編集 → groups.json ダウンロードフローの改善（`psar serve` でローカルHTTP立ち上げ + 直接保存を実装済み。`http://` モードで `/api/save-groups` に POST して直接書き込み）
 - [ ] ワークディレクトリ名を `.psar/` から `psar_work/` に変更検討（hidden だと Windows エクスプローラで見えない問題）
 - [x] GUI の確認ダイアログに dry-run 結果サマリ表示
 - [x] GUI の進捗ログをワーカースレッドから逐次表示（_TextHandler で実装済み）
