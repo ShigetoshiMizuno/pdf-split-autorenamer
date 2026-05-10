@@ -12,8 +12,9 @@ import fitz
 
 from . import textops
 from .pdfio import (
-    extract_text, find_pdftotext,
-    list_pdfs, render_thumb,
+    calc_japanese_ratio, crop_page_pixmap,
+    extract_text, extract_text_tesseract, find_pdftotext,
+    get_ocr_cache_path, list_pdfs, read_ocr_cache, render_thumb, write_ocr_cache,
 )
 
 TITLE_MARKER_RE = re.compile(
@@ -40,17 +41,26 @@ def _jaccard(a: set[str], b: set[str]) -> float:
     return len(a & b) / len(a | b)
 
 
+_JA_QUALITY_THRESHOLD = 0.1  # 日本語比率がこれ未満なら Stage 2 OCR を試みる
+
+
 def collect_pages(src_dir: Path, thumb_dir: Path,
                   pdftotext_path: str | None = None,
                   pdf_filter=None,
-                  ocr_fallback: bool = True) -> list[dict]:
+                  ocr_fallback: bool = True,
+                  ocr_strategy: str = "balanced") -> list[dict]:
     """フォルダ内の各PDFを開いて、各ページのメタデータ・サムネ・OCRテキストを集める。
 
     pdf_filter: 関数 (Path) -> bool。True を返すPDFだけ対象にする。
     ocr_fallback: True の場合、テキストが空なら Tesseract でリトライする。
+    ocr_strategy:
+        "fast"     — Stage 1 のみ（pdftotext / PyMuPDF）
+        "balanced" — Stage 1 + テキスト空なら Tesseract（既定）
+        "roi"      — Stage 1 + 日本語比率低い場合に上部 ROI クロップ + Tesseract
     """
     thumb_dir.mkdir(parents=True, exist_ok=True)
     pdftotext_path = pdftotext_path or find_pdftotext()
+    work_dir = src_dir / ".psar"
 
     pages: list[dict] = []
     for pdf_path in list_pdfs(src_dir):
@@ -69,8 +79,21 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                 thumb_path = thumb_dir / thumb_name
                 if not thumb_path.exists():
                     render_thumb(page, thumb_path)
+                use_ocr = ocr_fallback and ocr_strategy != "fast"
                 text = extract_text(pdf_path, page_no, pdftotext_path,
-                                    ocr_fallback=ocr_fallback)
+                                    ocr_fallback=use_ocr)
+                if (ocr_strategy == "roi"
+                        and calc_japanese_ratio(text) < _JA_QUALITY_THRESHOLD):
+                    roi_bytes = crop_page_pixmap(page, ratio=0.3)
+                    cache_path = get_ocr_cache_path(work_dir, roi_bytes)
+                    cached = read_ocr_cache(cache_path)
+                    if cached is not None:
+                        text = cached
+                    else:
+                        roi_text = extract_text_tesseract(roi_bytes)
+                        if roi_text.strip():
+                            text = roi_text
+                        write_ocr_cache(cache_path, text)
                 head_text = "\n".join(
                     [l for l in textops.fix_mojibake(text).splitlines() if l.strip()][:3]
                 )[:200]

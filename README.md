@@ -145,41 +145,6 @@ label = "議事録"
 
 OCR 誤読マップは `profiles/scansnap-s500.toml` を参照してください。
 
-## よくある質問
-
-**Q: 日本語ファイル名でエラーになる**
-A: PyMuPDF `>=1.23,<1.26` を使用してください。本ツールは `stream=bytes` 経由で PDF を読み込むことで ANSI パス変換の問題を回避しています。
-
-**Q: 「テキストが取れない」と表示される（画像スキャンPDF）**
-A: テキストレイヤーがない PDF は Tesseract OCR が必要です。インストール後に自動的に使われます（`--no-ocr-fallback` で無効化可能）。
-
-**Q: 書類タイプが「書類」になってしまう**
-A: デフォルトパターンが合わない場合は `--profile` で TOML プロファイルを指定してください。`profiles/church.toml` がサンプルです。
-
-**Q: 日付不明になるファイルがある**
-A: OCR テキストに日付が含まれていないか、認識できない形式の場合です。`psar rename --retarget-unknown --apply` で再度試行できます。
-
-**Q: 分割結果がおかしい（境界が多すぎ/少なすぎ）**
-A: `report.html` をブラウザで開き、「↑つなぐ／↑切る」で境界を手動調整してください。
-
-**Q: バージョンを確認したい**
-A: `psar --version` で確認できます。
-
-**Q: 出力がファイルにリダイレクトすると文字化けする（Windows）**
-A: PowerShell / コマンドプロンプトでは stdout のエンコーディングが cp932 になる場合があります。
-以下の環境変数を設定してから実行してください：
-```cmd
-set PYTHONIOENCODING=utf-8
-psar analyze ./pdfs > result.txt
-```
-または PowerShell では：
-```powershell
-$env:PYTHONIOENCODING = "utf-8"
-psar analyze ./pdfs > result.txt
-```
-
----
-
 ## ライセンス
 
 MIT License — 詳細は [LICENSE](LICENSE) を参照してください。

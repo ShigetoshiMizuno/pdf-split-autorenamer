@@ -149,6 +149,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--title", default="PDF 分割レビュー", help="HTMLレポートのタイトル")
     sp.add_argument("--no-ocr-fallback", action="store_true",
                     help="Tesseract による OCR フォールバックを無効化")
+    sp.add_argument("--ocr-strategy", default="balanced",
+                    choices=["fast", "balanced", "roi", "thorough", "llm"],
+                    help="OCR 戦略: fast/balanced/roi/thorough/llm")
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_analyze)
