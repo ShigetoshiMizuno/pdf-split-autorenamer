@@ -200,3 +200,11 @@ class TestRunRename:
         _make_pdf(src)  # no text, kind inferred from filename
         result = run_rename(tmp_path, mode="unknown")
         assert any(a["status"] == "noop" for a in result["actions"])
+
+    def test_rename_error_sets_error_status(self, tmp_path):
+        from unittest.mock import patch
+        src = tmp_path / "scan_01.pdf"
+        _make_pdf(src, text="2026年4月6日 週報")
+        with patch.object(Path, "rename", side_effect=OSError("permission denied")):
+            result = run_rename(tmp_path, mode="split", apply=True)
+        assert any(a["status"].startswith("error:") for a in result["actions"])

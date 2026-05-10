@@ -112,6 +112,21 @@ class TestRunSplitErrors:
         assert summary["files_written"] == 1
         assert (tmp_path / "scan_01.pdf").exists()
 
+    def test_save_pdf_pages_error_sets_error_status(self, tmp_path):
+        from unittest.mock import patch
+        src_pdf = tmp_path / "scan.pdf"
+        _make_pdf(src_pdf, pages=2)
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        (work_dir / "groups.json").write_text(
+            json.dumps({"scan.pdf": [{"range": [1, 2], "name": ""}]}),
+            encoding="utf-8",
+        )
+        with patch("pdf_split_autorenamer.split.save_pdf_pages",
+                   side_effect=Exception("disk full")):
+            summary = run_split(tmp_path, work_dir=work_dir)
+        assert any(a["status"].startswith("error:") for a in summary["actions"])
+
     def test_named_group_includes_name_in_filename(self, tmp_path):
         src_pdf = tmp_path / "scan.pdf"
         _make_pdf(src_pdf, pages=2)
