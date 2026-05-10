@@ -137,3 +137,103 @@ class TestListPdfs:
         names = [p.name for p in result]
         assert "top.pdf" in names
         assert "nested.pdf" not in names
+
+
+# ---------------------------------------------------------------------------
+# find_tesseract: candidate path hit (L36)
+# ---------------------------------------------------------------------------
+
+class TestFindTesseractCandidatePath:
+    def test_candidate_path_found_returns_path(self, monkeypatch, tmp_path):
+        """候補パスのいずれかが存在するとき、そのパスを返す（L36）"""
+        from pdf_split_autorenamer.pdfio import find_tesseract
+        monkeypatch.delenv("TESSERACT", raising=False)
+        with patch("shutil.which", return_value=None):
+            with patch("pathlib.Path.is_file", return_value=True):
+                result = find_tesseract()
+        assert result is not None
+        assert isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# extract_text_tesseract: success & exception paths (L74, L75-76)
+# ---------------------------------------------------------------------------
+
+class TestExtractTextTesseract:
+    def test_success_path_returns_stdout(self, monkeypatch, tmp_path):
+        """tessdata エラーなし → stdout のテキストを返す（L74）"""
+        from unittest.mock import MagicMock
+        from pdf_split_autorenamer.pdfio import extract_text_tesseract
+        fake_tess = str(tmp_path / "tesseract")
+        monkeypatch.setenv("TESSERACT", fake_tess)
+        (tmp_path / "tesseract").write_bytes(b"fake")
+        mock_proc = MagicMock()
+        mock_proc.stdout = b"extracted text\n"
+        mock_proc.stderr = b""  # "tessdata" を含まない
+        with patch("shutil.which", return_value=fake_tess):
+            with patch("subprocess.run", return_value=mock_proc):
+                result = extract_text_tesseract(b"fake_image")
+        assert "extracted text" in result
+
+    def test_exception_returns_empty(self, monkeypatch, tmp_path):
+        """subprocess.run が例外を送出した場合は空文字を返す（L75-76）"""
+        from pdf_split_autorenamer.pdfio import extract_text_tesseract
+        fake_tess = str(tmp_path / "tesseract")
+        (tmp_path / "tesseract").write_bytes(b"fake")
+        with patch("shutil.which", return_value=fake_tess):
+            with patch("subprocess.run", side_effect=TimeoutError("timeout")):
+                result = extract_text_tesseract(b"fake_image")
+        assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# extract_text_pdftotext: unlink exception in finally (L127-128)
+# ---------------------------------------------------------------------------
+
+class TestExtractTextPdftotextFinally:
+    def test_unlink_exception_is_swallowed(self, tmp_path, monkeypatch):
+        """一時ファイルの削除が失敗しても例外は伝播しない（L127-128）"""
+        import fitz
+        from pdf_split_autorenamer.pdfio import extract_text_pdftotext
+        # 実際のPDFを作成
+        pdf_path = tmp_path / "test.pdf"
+        doc = fitz.open()
+        doc.new_page()
+        doc.save(str(pdf_path))
+        doc.close()
+        # pdftotext が存在しない場合は早期リターンするので
+        # subprocess.run をモックしてpdftotext実行をシミュレート
+        from unittest.mock import MagicMock, patch
+        fake_proc = MagicMock()
+        fake_proc.stdout = b"extracted text"
+        with patch("shutil.which", return_value="/fake/pdftotext"):
+            with patch("subprocess.run", return_value=fake_proc):
+                with patch("pathlib.Path.unlink", side_effect=OSError("cannot delete")):
+                    result = extract_text_pdftotext(pdf_path, pdftotext="/fake/pdftotext")
+        # 例外が伝播せず結果が返ること
+        assert isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# extract_text: OCR fallback success path (L163)
+# ---------------------------------------------------------------------------
+
+class TestExtractTextOcrFallback:
+    def test_ocr_fallback_returns_text_when_pdf_empty(self, tmp_path):
+        """テキストが空のとき OCR フォールバックが成功するとテキストを返す（L163）"""
+        import fitz
+        from unittest.mock import patch
+        from pdf_split_autorenamer.pdfio import extract_text
+        # 空のPDFを作成
+        pdf_path = tmp_path / "empty.pdf"
+        doc = fitz.open()
+        doc.new_page()
+        doc.save(str(pdf_path))
+        doc.close()
+        # pdftotext と pymupdf は空を返し、OCRのみ成功するシミュレート
+        with patch("pdf_split_autorenamer.pdfio.extract_text_pdftotext", return_value=""):
+            with patch("pdf_split_autorenamer.pdfio.extract_text_pymupdf", return_value=""):
+                with patch("pdf_split_autorenamer.pdfio.extract_text_tesseract",
+                           return_value="OCR で取れたテキスト"):
+                    result = extract_text(pdf_path, ocr_fallback=True)
+        assert "OCR で取れたテキスト" in result
