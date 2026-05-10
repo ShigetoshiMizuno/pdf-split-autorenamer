@@ -180,7 +180,7 @@ v1.0.0:
 ### T-12: ユーザビリティ細部
 - [Issue #8] [担当: PRGちゃん] [推定: 1〜2日]
 - [x] `psar --version` の実装（`importlib.metadata.version()` 使用）
-- [ ] エラーメッセージの日本語統一・改善
+- [x] エラーメッセージの日本語統一・改善（cli.py / split.py / analyze.py / rename.py のエラー・警告メッセージを日本語化）
 - [x] README「よくある質問」セクション追加
 - [x] `report.html` に「OCR テキストが空のページ」の視覚的警告追加
 - [x] HTML レポートでの境界編集 → groups.json ダウンロードフローの改善（`psar serve` でローカルHTTP立ち上げ + 直接保存を実装済み。`http://` モードで `/api/save-groups` に POST して直接書き込み）
