@@ -165,6 +165,19 @@ A: `report.html` をブラウザで開き、「↑つなぐ／↑切る」で境
 **Q: バージョンを確認したい**
 A: `psar --version` で確認できます。
 
+**Q: 出力がファイルにリダイレクトすると文字化けする（Windows）**
+A: PowerShell / コマンドプロンプトでは stdout のエンコーディングが cp932 になる場合があります。
+以下の環境変数を設定してから実行してください：
+```cmd
+set PYTHONIOENCODING=utf-8
+psar analyze ./pdfs > result.txt
+```
+または PowerShell では：
+```powershell
+$env:PYTHONIOENCODING = "utf-8"
+psar analyze ./pdfs > result.txt
+```
+
 ---
 
 ## ライセンス
