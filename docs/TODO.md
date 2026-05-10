@@ -162,20 +162,20 @@ v1.0.0:
 
 ### T-10: テストスイート整備
 - [Issue なし] [担当: QAちゃん/PRGちゃん] [推定: 3〜5日]
-- [ ] `tests/` ディレクトリ作成
-- [ ] `test_textops.py`: `fix_mojibake`, `fix_broken_unicode`, `extract_dates_all`, `extract_kind`, `sanitize_filename`
-- [ ] `test_pdfio.py`: `extract_text`, `save_pdf_pages`（最小サンプル PDF 使用）
-- [ ] `test_analyze.py`: `score_boundary`, `build_initial_groups`
-- [ ] `test_split.py`: `normalize_groups`, `run_split`（dry-run）
-- [ ] `test_rename.py`: `choose_date`, `resolve_filenames`, `run_rename`（dry-run）
-- [ ] GitHub Actions に pytest ジョブを追加
-- [ ] カバレッジ目標: 70%
+- [x] `tests/` ディレクトリ作成
+- [x] `test_textops.py`: `fix_mojibake`, `fix_broken_unicode`, `extract_dates_all`, `extract_kind`, `sanitize_filename`
+- [x] `test_pdfio.py`: `extract_text`, `save_pdf_pages`（最小サンプル PDF 使用）
+- [x] `test_analyze.py`: `score_boundary`, `build_initial_groups`
+- [x] `test_split.py`: `normalize_groups`, `run_split`（dry-run は実PDF不要な normalize_groups のみ）
+- [x] `test_rename.py`: `choose_date`, `resolve_filenames`, `run_rename`（dry-run）
+- [x] GitHub Actions に pytest ジョブを追加（test.yml）
+- [x] カバレッジ目標: 70% → 達成（non-GUI 81%、全体 63%）
 
 ### T-11: PyPI 公開
 - [Issue なし] [担当: PRGちゃん] [推定: 0.5日]
-- [ ] `pyproject.toml` の classifiers を `Development Status :: 4 - Beta` 以降に更新
-- [ ] `python -m build` + `twine upload` で PyPI アップロード
-- [ ] README バッジ（PyPI バージョン・ライセンス）追加
+- [x] `pyproject.toml` の classifiers を `Development Status :: 4 - Beta` 以降に更新
+- [ ] `python -m build` + `twine upload` で PyPI アップロード（監督の承認後に実施）
+- [x] README バッジ（PyPI バージョン・ライセンス）追加
 
 ### T-12: ユーザビリティ細部
 - [Issue #8] [担当: PRGちゃん] [推定: 1〜2日]
