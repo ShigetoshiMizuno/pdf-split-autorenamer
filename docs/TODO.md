@@ -121,35 +121,35 @@ v1.0.0:
 
 ### T-05: OcrBackend 抽象クラス設計
 - [Issue #4] [担当: PRGちゃん] [推定: 1日]
-- [ ] `ocr_backend.py` を新設
-- [ ] `OcrBackend` 抽象基底クラス定義（`extract_text`, `extract_structured`）
-- [ ] `TesseractBackend` を T-01 実装から昇格・リファクタリング
-- [ ] `PaddleOCRBackend` のスタブ（オプショナル extras）
-- [ ] `AzureReadBackend` / `GoogleVisionBackend` のスタブ（オプショナル extras）
+- [x] `ocr_backend.py` を新設
+- [x] `OcrBackend` 抽象基底クラス定義（`extract_text`, `extract_structured`）
+- [x] `TesseractBackend` を T-01 実装から昇格・リファクタリング
+- [x] `PaddleOCRBackend` のスタブ（オプショナル extras）
+- [x] `AzureReadBackend` / `GoogleVisionBackend` のスタブ（オプショナル extras）
 
 ### T-06: Stage 2 ROI 限定 OCR 実装
 - [Issue #5] [担当: PRGちゃん] [推定: 1〜2日]
-- [ ] `pdfio.crop_page_pixmap(page, ratio: float = 0.3) -> bytes` を追加
-- [ ] `analyze.py` の `collect_pages()` に `ocr_strategy` パラメータを追加
-- [ ] Stage 1 失敗時（テキスト空 or 化け率高い）に Stage 2 を自動発動
-- [ ] 化け率判定: 日本語文字（U+3040〜U+9FFF）の比率 < 閾値（既定 0.1）を「失敗」とみなす
-- [ ] OCR キャッシュ（`.psar/ocr_cache/<hash>.txt`）実装
+- [x] `pdfio.crop_page_pixmap(page, ratio: float = 0.3) -> bytes` を追加
+- [x] `analyze.py` の `collect_pages()` に `ocr_strategy` パラメータを追加
+- [x] Stage 1 失敗時（テキスト空 or 化け率高い）に Stage 2 を自動発動
+- [x] 化け率判定: 日本語文字（U+3040〜U+9FFF）の比率 < 閾値（既定 0.1）を「失敗」とみなす
+- [x] OCR キャッシュ（`.psar/ocr_cache/<hash>.txt`）実装
 
 ### T-07: Stage 3 LLM Vision バックエンド
 - [Issue #4, #5] [担当: PRGちゃん] [推定: 2〜3日]
-- [ ] `ClaudeVisionBackend` / `GPT4VisionBackend` の実装
-- [ ] 構造化抽出プロンプト（`{"date": "YYYY-MM-DD", "title": "..."}`）
-- [ ] JSON Schema 検証
-- [ ] `keyring` ライブラリによる API キー管理
-- [ ] GUI に API キー入力欄・見積もりコスト表示・確認ダイアログ
-- [ ] `pyproject.toml` に `[project.optional-dependencies] llm = [...]` 追加
-- [ ] プライバシー警告: クラウド送信の明示的オプトインのみで発動
+- [x] `ClaudeVisionBackend` / `GPT4VisionBackend` の実装（ClaudeVisionBackend 実装・GPT4 はスタブ）
+- [x] 構造化抽出プロンプト（`{"date": "YYYY-MM-DD", "title": "..."}`）
+- [x] JSON Schema 検証（validate_structured_output）
+- [x] `keyring` ライブラリによる API キー管理（get_api_key）
+- [ ] GUI に API キー入力欄・見積もりコスト表示・確認ダイアログ（v1.0 持ち越し）
+- [x] `pyproject.toml` に `[project.optional-dependencies] llm = [...]` 追加
+- [x] プライバシー警告: クラウド送信の明示的オプトインのみで発動
 
 ### T-08: フォールバック判定ロジックと戦略設定
 - [Issue #5] [担当: PRGちゃん] [推定: 1日]
-- [ ] `OcrStrategy` クラスの定義（Stage 1〜4 を順次試す）
-- [ ] CLI `--ocr-strategy {fast,balanced,thorough,llm}` オプション追加
-- [ ] `.psar/config.toml` 読み込み実装（戦略・プロファイル・ROI 比率の保存）
+- [x] `OcrStrategy` クラスの定義（Stage 1〜4 を順次試す）
+- [x] CLI `--ocr-strategy {fast,balanced,thorough,llm}` オプション追加
+- [x] `.psar/config.toml` 読み込み実装（load_psar_config で実装）
 
 ### T-09: ベンチマーク
 - [Issue #4, #5] [担当: SPECちゃん/PRGちゃん] [推定: 1〜2日]
