@@ -1,0 +1,215 @@
+# -*- coding: utf-8 -*-
+"""T-10a: pdfio モジュールのユニットテスト
+
+対象関数:
+- extract_text_pymupdf
+- save_pdf_pages
+- has_text_layer
+- find_tesseract
+
+テスト用 PDF は PyMuPDF でプログラム的に生成する。
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import fitz
+import pytest
+
+from pdf_split_autorenamer.pdfio import (
+    extract_text_pymupdf,
+    find_tesseract,
+    has_text_layer,
+    save_pdf_pages,
+)
+
+
+# ---------------------------------------------------------------------------
+# ヘルパー: テスト用 PDF 生成
+# ---------------------------------------------------------------------------
+
+def make_simple_pdf(text: str = "テスト文書 2026年4月6日") -> bytes:
+    """テキストレイヤー付きの最小 PDF を bytes で返す"""
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), text, fontsize=12)
+    data = doc.write()
+    doc.close()
+    return data
+
+
+def make_multipage_pdf(pages: list[str]) -> bytes:
+    """複数ページの PDF を生成して bytes で返す"""
+    doc = fitz.open()
+    for text in pages:
+        page = doc.new_page()
+        page.insert_text((72, 72), text, fontsize=12)
+    data = doc.write()
+    doc.close()
+    return data
+
+
+def make_image_only_pdf() -> bytes:
+    """テキストレイヤーなし（画像のみ）の PDF を bytes で返す"""
+    doc = fitz.open()
+    doc.new_page()  # 何も書き込まない
+    data = doc.write()
+    doc.close()
+    return data
+
+
+# ---------------------------------------------------------------------------
+# extract_text_pymupdf
+# ---------------------------------------------------------------------------
+
+class TestExtractTextPymupdf:
+    def test_extracts_text_from_single_page(self, tmp_path):
+        """生成した PDF から全ページテキストが取得できる"""
+        pdf_path = tmp_path / "test.pdf"
+        pdf_path.write_bytes(make_simple_pdf("テスト文書 2026年4月6日"))
+
+        result = extract_text_pymupdf(pdf_path)
+        assert "テスト" in result or "2026" in result, \
+            f"テキスト抽出結果が想定外: {result!r}"
+
+    def test_extracts_specific_page(self, tmp_path):
+        """page_no 指定でそのページのテキストが取得できる"""
+        pdf_path = tmp_path / "multipage.pdf"
+        pdf_path.write_bytes(make_multipage_pdf(["ページ1のテキスト", "ページ2のテキスト"]))
+
+        # 1ページ目
+        result1 = extract_text_pymupdf(pdf_path, page_no=1)
+        assert len(result1) > 0, "1ページ目のテキストが取得できない"
+
+    def test_nonexistent_page_returns_empty(self, tmp_path):
+        """存在しないページ番号では空文字列を返す"""
+        pdf_path = tmp_path / "test.pdf"
+        pdf_path.write_bytes(make_simple_pdf())
+
+        result = extract_text_pymupdf(pdf_path, page_no=999)
+        assert result == "", f"存在しないページで空文字列以外が返った: {result!r}"
+
+    def test_nonexistent_file_returns_empty(self, tmp_path):
+        """存在しないファイルパスでは例外を出さず空文字列を返す"""
+        pdf_path = tmp_path / "no_such_file.pdf"
+        result = extract_text_pymupdf(pdf_path)
+        assert result == "", f"存在しないファイルで空文字列以外が返った: {result!r}"
+
+    def test_page_no_none_returns_all_pages(self, tmp_path):
+        """page_no=None（デフォルト）では全ページのテキストを返す"""
+        pdf_path = tmp_path / "multipage.pdf"
+        pdf_path.write_bytes(make_multipage_pdf(["ページ1", "ページ2", "ページ3"]))
+
+        result = extract_text_pymupdf(pdf_path, page_no=None)
+        assert len(result) > 0, "全ページテキストが空"
+
+
+# ---------------------------------------------------------------------------
+# save_pdf_pages
+# ---------------------------------------------------------------------------
+
+class TestSavePdfPages:
+    def test_saves_single_page_from_multipage_pdf(self, tmp_path):
+        """3ページ PDF から1ページ目のみ抽出できる"""
+        src_path = tmp_path / "src.pdf"
+        out_path = tmp_path / "out.pdf"
+        src_path.write_bytes(make_multipage_pdf(["ページ1", "ページ2", "ページ3"]))
+
+        count = save_pdf_pages(src_path, 1, 1, out_path)
+
+        assert out_path.exists(), "出力ファイルが存在しない"
+        assert count == 1, f"返り値が 1 でない: {count}"
+
+    def test_output_file_is_valid_pdf(self, tmp_path):
+        """出力ファイルが PyMuPDF で開けること"""
+        src_path = tmp_path / "src.pdf"
+        out_path = tmp_path / "out.pdf"
+        src_path.write_bytes(make_multipage_pdf(["ページ1", "ページ2", "ページ3"]))
+
+        save_pdf_pages(src_path, 1, 1, out_path)
+
+        with fitz.open(stream=out_path.read_bytes(), filetype="pdf") as doc:
+            assert doc.page_count >= 1, "出力 PDF のページ数が 0"
+
+    def test_return_value_matches_page_count(self, tmp_path):
+        """返り値が to_page - from_page + 1 と一致する"""
+        src_path = tmp_path / "src.pdf"
+        out_path = tmp_path / "out.pdf"
+        src_path.write_bytes(make_multipage_pdf(["P1", "P2", "P3"]))
+
+        count = save_pdf_pages(src_path, 1, 2, out_path)
+        assert count == 2, f"2ページ抽出の返り値が 2 でない: {count}"
+
+    def test_saves_last_page(self, tmp_path):
+        """最終ページのみ抽出できる"""
+        src_path = tmp_path / "src.pdf"
+        out_path = tmp_path / "out.pdf"
+        src_path.write_bytes(make_multipage_pdf(["P1", "P2", "P3"]))
+
+        count = save_pdf_pages(src_path, 3, 3, out_path)
+        assert count == 1
+        assert out_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# has_text_layer
+# ---------------------------------------------------------------------------
+
+class TestHasTextLayer:
+    def test_returns_true_for_pdf_with_text(self, tmp_path):
+        """テキストレイヤーあり PDF → True"""
+        pdf_path = tmp_path / "with_text.pdf"
+        pdf_path.write_bytes(make_simple_pdf("テキストあり"))
+
+        assert has_text_layer(pdf_path) is True
+
+    def test_returns_false_for_image_only_pdf(self, tmp_path):
+        """画像のみ PDF（テキストなし）→ False"""
+        pdf_path = tmp_path / "no_text.pdf"
+        pdf_path.write_bytes(make_image_only_pdf())
+
+        assert has_text_layer(pdf_path) is False
+
+    def test_returns_false_for_nonexistent_file(self, tmp_path):
+        """存在しないファイルは False を返す（例外なし）"""
+        pdf_path = tmp_path / "no_such.pdf"
+        result = has_text_layer(pdf_path)
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# find_tesseract
+# ---------------------------------------------------------------------------
+
+class TestFindTesseract:
+    def test_return_type_is_str_or_none(self):
+        """戻り値が str | None 型であること"""
+        result = find_tesseract()
+        assert result is None or isinstance(result, str), \
+            f"戻り値が str/None でない: {type(result)}"
+
+    def test_env_var_tesseract_is_honored(self, tmp_path, monkeypatch):
+        """環境変数 TESSERACT が設定されていればそれが返ること"""
+        # 実在するファイルを作る
+        fake_tess = tmp_path / "tesseract.exe"
+        fake_tess.write_bytes(b"")
+
+        monkeypatch.setenv("TESSERACT", str(fake_tess))
+        result = find_tesseract()
+        assert result == str(fake_tess), \
+            f"TESSERACT 環境変数が無視されている: {result!r}"
+
+    def test_env_var_tesseract_nonexistent_path_falls_through(self, monkeypatch):
+        """TESSERACT 環境変数が存在しないパスを指していれば PATH 検索にフォールスルーする"""
+        monkeypatch.setenv("TESSERACT", "/nonexistent/path/tesseract")
+        # 例外が起きないこと（None または PATH 上の tesseract が返る）
+        result = find_tesseract()
+        assert result is None or isinstance(result, str)
+
+    def test_unset_env_var_does_not_raise(self, monkeypatch):
+        """TESSERACT 環境変数が未設定でも例外が起きない"""
+        monkeypatch.delenv("TESSERACT", raising=False)
+        result = find_tesseract()
+        assert result is None or isinstance(result, str)

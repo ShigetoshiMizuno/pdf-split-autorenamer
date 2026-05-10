@@ -16,7 +16,23 @@ ScanSnap のように1つのPDFに複数の書類が連続スキャンされて�
    と書類タイプ（プロファイル方式でカスタマイズ可）から `YYYY-MM-DD_xxx.pdf` の形式に命名。
    表記揺れはフォルダ内で統一されます。
 
-## インストール
+## ダウンロード（スタンドアロン実行ファイル）
+
+[GitHub Releases](https://github.com/ShigetoshiMizuno/pdf-split-autorenamer/releases) から
+プラットフォームに合った実行ファイルをダウンロードできます。
+
+| プラットフォーム | ファイル |
+|---|---|
+| Windows | `psar-windows.exe` |
+| macOS | `psar-macos` |
+| Linux | `psar-linux` |
+
+> **注意**: Poppler (`pdftotext`) と Tesseract OCR は **別途インストール**が必要です。
+> 実行ファイルには同梱されていません。
+
+---
+
+## インストール（Python パッケージ）
 
 ### 必要なもの
 
@@ -102,21 +118,49 @@ scanned_pdfs/
   日付不明_xxx.pdf                          # 日付検出不能
 ```
 
-## 書類タイプのカスタマイズ
+## 書類タイプのカスタマイズ（プロファイル）
 
-`pdf_split_autorenamer.textops` の `DEFAULT_TITLE_PATTERNS` / `DEFAULT_BODY_PATTERNS` を
-参考に、自分の用途のプロファイルを書けます。
-将来的にはコマンドライン／GUI から外部プロファイルを読み込めるようにする予定です。
+`profiles/church.toml` や `profiles/business.toml` を参考に TOML プロファイルを作成し、
+`--profile` オプションで読み込めます。
+
+```sh
+psar rename ./scanned_pdfs --profile profiles/my_profile.toml --apply
+```
+
+プロファイルのフォーマット:
+
+```toml
+[[title_patterns]]
+pattern = "議事録"
+label = "議事録"
+
+[[body_patterns]]
+pattern = "出席者"
+label = "議事録"
+```
+
+OCR 誤読マップは `profiles/scansnap-s500.toml` を参照してください。
 
 ## ライセンス
 
 MIT License — 詳細は [LICENSE](LICENSE) を参照してください。
 
+## OCR フォールバック
+
+テキストレイヤーなしの画像PDFには、Tesseract OCR が自動的に使われます。
+
+```sh
+# Tesseract をインストール後、日本語用データも追加
+# Windows: https://github.com/UB-Mannheim/tesseract/wiki
+# macOS:   brew install tesseract tesseract-lang
+# Linux:   apt install tesseract-ocr tesseract-ocr-jpn
+
+# OCR フォールバックを無効化したい場合
+psar analyze ./scanned_pdfs --no-ocr-fallback
+```
+
 ## 注意
 
-- このツールは「OCRテキストが埋め込まれたPDF」を前提にしています。画像のみのPDFには
-  別途 OCR (Tesseract 等) を先にかける必要があります。
 - 自動命名はあくまで補助です。実行前に必ず dry-run で結果を確認してください。
-- Windows で日本語ファイル名を扱う際、過去のバージョンの PyMuPDF (1.24 等) では
-  ANSI フォールバックで化けが起きるケースがありました。本ツールは
-  `Document.write()` のバイト経由で書き出すことでこれを回避しています。
+- Windows で日本語ファイル名を扱う際、PyMuPDF は `stream=bytes` 経由で入力することで
+  ANSI パス変換の問題を回避しています。PyMuPDF `>=1.23,<1.26` を推奨します。

@@ -2,6 +2,7 @@
 """PDFの内容（OCR埋め込みテキスト）から日付・書類タイプを推定して自動リネームする"""
 from __future__ import annotations
 
+import logging
 import re
 from collections import Counter
 from pathlib import Path
@@ -96,21 +97,28 @@ def find_targets(src_dir: Path, mode: str = "split") -> list[Path]:
 
 
 def make_plan(targets: list[Path], pdftotext_path: str | None = None,
-              kind_default: str = "書類") -> list[dict]:
+              kind_default: str = "書類",
+              ocr_fallback: bool = True,
+              title_patterns: list | None = None,
+              body_patterns: list | None = None) -> list[dict]:
     """各PDFについて (date, kind, fallback_title, head) を計算する"""
     pdftotext_path = pdftotext_path or find_pdftotext()
     plan: list[dict] = []
     for p in targets:
-        text = extract_text(p, pdftotext=pdftotext_path)
+        text = extract_text(p, pdftotext=pdftotext_path, ocr_fallback=ocr_fallback)
         head = "\n".join(
             [l for l in textops.fix_mojibake(text).splitlines() if l.strip()][:3]
         )[:120]
         date = choose_date(text, p.name)
-        kind = textops.extract_kind(text, default_kind=kind_default)
+        kind = textops.extract_kind(text, default_kind=kind_default,
+                                    title_patterns=title_patterns,
+                                    body_patterns=body_patterns)
         if kind == kind_default:
             # ファイル名ヒントからも探す
             name_part = textops.fix_mojibake(existing_name_part(p.name))
-            kind2 = textops.extract_kind(name_part, default_kind=kind_default)
+            kind2 = textops.extract_kind(name_part, default_kind=kind_default,
+                                         title_patterns=title_patterns,
+                                         body_patterns=body_patterns)
             if kind2 != kind_default:
                 kind = kind2
         fb = fallback_title(p.name) if kind == kind_default else ""
@@ -145,18 +153,29 @@ def resolve_filenames(plan: list[dict]) -> list[dict]:
 
 def run_rename(src_dir: Path, mode: str = "split", apply: bool = False,
                pdftotext_path: str | None = None,
-               kind_default: str = "書類") -> dict:
+               kind_default: str = "書類",
+               ocr_fallback: bool = True,
+               profile: Path | None = None) -> dict:
     """PDFを内容ベースで自動リネームする。
 
     mode: 'split' (分割直後) / 'unknown' (日付不明_) / 'all' (両方)
     apply=False は dry-run。
+    profile: TOML プロファイルファイルのパス。指定時はプロファイルのパターンを使用。
     """
     src_dir = Path(src_dir)
     targets = find_targets(src_dir, mode=mode)
+
+    title_patterns = None
+    body_patterns = None
+    if profile is not None:
+        title_patterns, body_patterns = textops.load_profile(profile)
+
     if not targets:
         return {"targets": 0, "actions": [], "applied": 0}
 
-    plan = make_plan(targets, pdftotext_path=pdftotext_path, kind_default=kind_default)
+    plan = make_plan(targets, pdftotext_path=pdftotext_path, kind_default=kind_default,
+                     ocr_fallback=ocr_fallback,
+                     title_patterns=title_patterns, body_patterns=body_patterns)
     plan = resolve_filenames(plan)
 
     actions: list[dict] = []
@@ -182,6 +201,7 @@ def run_rename(src_dir: Path, mode: str = "split", apply: bool = False,
                 action["status"] = "ok"
                 applied += 1
             except Exception as e:
+                logging.error("failed to rename %s: %s", src.name, e)
                 action["status"] = f"error: {e}"
         else:
             action["status"] = "dry-run"

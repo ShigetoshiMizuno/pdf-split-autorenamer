@@ -2,6 +2,7 @@
 """PDF入出力ユーティリティ（PyMuPDF + Poppler pdftotext）"""
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
@@ -10,6 +11,68 @@ from pathlib import Path
 from typing import Iterator
 
 import fitz  # PyMuPDF
+
+
+def find_tesseract() -> str | None:
+    """tesseract の実行ファイルを探す。環境変数 TESSERACT を最優先。"""
+    env_path = os.environ.get("TESSERACT")
+    if env_path and Path(env_path).is_file():
+        return env_path
+    # PATH 上を探す
+    p = shutil.which("tesseract") or shutil.which("tesseract.exe")
+    if p:
+        return p
+    # Windows でよくあるインストール先
+    candidates = [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        "/usr/bin/tesseract",
+        "/usr/local/bin/tesseract",
+        "/opt/homebrew/bin/tesseract",
+    ]
+    for c in candidates:
+        if Path(c).is_file():
+            return c
+    return None
+
+
+def has_text_layer(pdf_path: Path) -> bool:
+    """PDFにテキストレイヤーがあるか確認する。
+    1ページでも空でないテキストがあれば True、全ページ空なら False。"""
+    try:
+        with fitz.open(stream=pdf_path.read_bytes(), filetype="pdf") as doc:
+            for page in doc:
+                if page.get_text().strip():
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def extract_text_tesseract(image_bytes: bytes, lang: str = "jpn") -> str:
+    """tesseract を subprocess で呼び出してテキストを返す。
+    tesseract が見つからない場合や jpn traineddata がない場合は空文字列を返す。"""
+    tess = find_tesseract()
+    if not tess:
+        return ""
+    cmd = [tess, "stdin", "stdout", "-l", lang, "--psm", "3"]
+    try:
+        result = subprocess.run(
+            cmd,
+            input=image_bytes,
+            capture_output=True,
+            timeout=30,
+        )
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        if "tessdata" in stderr:
+            logging.warning(
+                "Tesseract jpn traineddata が見つかりません。"
+                "インストール方法: https://github.com/UB-Mannheim/tesseract/wiki"
+            )
+            return ""
+        return result.stdout.decode("utf-8", errors="replace")
+    except Exception:
+        return ""
 
 
 def find_pdftotext() -> str | None:
@@ -67,7 +130,7 @@ def extract_text_pdftotext(pdf_path: Path, page_no: int | None = None,
 def extract_text_pymupdf(pdf_path: Path, page_no: int | None = None) -> str:
     """PyMuPDF で生テキストを取得（pdftotext がない場合のフォールバック）"""
     try:
-        with fitz.open(pdf_path) as doc:
+        with fitz.open(stream=pdf_path.read_bytes(), filetype="pdf") as doc:
             if page_no is not None:
                 if 1 <= page_no <= doc.page_count:
                     return doc[page_no - 1].get_text()
@@ -78,11 +141,27 @@ def extract_text_pymupdf(pdf_path: Path, page_no: int | None = None) -> str:
 
 
 def extract_text(pdf_path: Path, page_no: int | None = None,
-                 pdftotext: str | None = None) -> str:
-    """テキスト抽出: pdftotext を優先、なければ PyMuPDF。"""
+                 pdftotext: str | None = None,
+                 ocr_fallback: bool = True) -> str:
+    """テキスト抽出: pdftotext を優先、なければ PyMuPDF。
+    ocr_fallback=True の場合、テキストが空なら Tesseract でリトライする。"""
     text = extract_text_pdftotext(pdf_path, page_no, pdftotext)
     if not text.strip():
         text = extract_text_pymupdf(pdf_path, page_no)
+    if not text.strip() and ocr_fallback:
+        try:
+            with fitz.open(stream=pdf_path.read_bytes(), filetype="pdf") as doc:
+                if page_no is not None:
+                    pages = [doc[page_no - 1]] if 1 <= page_no <= doc.page_count else []
+                else:
+                    pages = list(doc)
+                for page in pages:
+                    image_bytes = page.get_pixmap(matrix=fitz.Matrix(2, 2)).tobytes("png")
+                    ocr_text = extract_text_tesseract(image_bytes)
+                    if ocr_text.strip():
+                        return ocr_text
+        except Exception:
+            pass
     return text
 
 
@@ -97,34 +176,11 @@ def render_thumb(page: fitz.Page, out_path: Path, max_long_side: int = 600,
     pix.save(str(out_path), jpg_quality=jpeg_quality)
 
 
-def avg_phash(page: fitz.Page) -> int:
-    """ページから 8x8 平均ハッシュを計算"""
-    z = 8 / max(page.rect.width, 1)
-    pix = page.get_pixmap(
-        matrix=fitz.Matrix(z, z),
-        alpha=False, colorspace=fitz.csGRAY,
-    )
-    samples = list(pix.samples)
-    if len(samples) < 64:
-        samples = samples + [0] * (64 - len(samples))
-    samples = samples[:64]
-    avg = sum(samples) / 64
-    bits = 0
-    for i, v in enumerate(samples):
-        if v >= avg:
-            bits |= 1 << i
-    return bits
-
-
-def hamming(a: int, b: int) -> int:
-    return bin(a ^ b).count("1")
-
-
 def save_pdf_pages(src_pdf: Path, from_page: int, to_page: int, out_path: Path,
                    garbage: int = 3, deflate: bool = True) -> int:
     """src_pdf の from_page〜to_page (1-based) を out_path に書き出す。
     PyMuPDF の Document.write でバイト経由にして日本語パスを安全に扱う。"""
-    with fitz.open(src_pdf) as src_doc:
+    with fitz.open(stream=src_pdf.read_bytes(), filetype="pdf") as src_doc:
         new_doc = fitz.open()
         try:
             new_doc.insert_pdf(src_doc, from_page=from_page - 1, to_page=to_page - 1)

@@ -3,20 +3,37 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib  # type: ignore[no-reattr-module]
+    except ImportError:
+        tomllib = None  # type: ignore[assignment]
 
 # OCR の頻出誤認マッピング（漢字の似た字への誤読）
+# ScanSnap S500 固有の誤読を含む。profiles/scansnap-s500.toml で外部管理も可能。
 MOJIBAKE_FIX = {
     "朁": "月",
     "拁": "拝",
     "紁": "旨",
     "迁": "迎",
     "曁": "曜",
+    # 「歓」の OCR 誤読バリアント（週報の「歓迎」を正規化するため）
+    "歎": "歓",
+    "藪": "歓",
+    "裁": "歓",
+    "鐵": "歓",
+    "欽": "歓",
 }
 
 
-def fix_mojibake(s: str) -> str:
-    """OCR の典型的な誤読パターンを修復"""
-    for k, v in MOJIBAKE_FIX.items():
+def fix_mojibake(s: str, extra_map: dict[str, str] | None = None) -> str:
+    """OCR の典型的な誤読パターンを修復。extra_map で追加置換を指定可能。"""
+    merged = {**MOJIBAKE_FIX, **(extra_map or {})}
+    for k, v in merged.items():
         s = s.replace(k, v)
     s = re.sub(r"(?<=[一-鿿])E\b", "", s)
     s = re.sub(r"(?<=[一-鿿])E(?=[^A-Za-z0-9])", "", s)
@@ -100,7 +117,7 @@ DEFAULT_TITLE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"クリスマス礼拝"), "クリスマス礼拝"),
     (re.compile(r"感謝祭"), "感謝祭"),
     (re.compile(r"週報"), "週報"),
-    (re.compile(r"歓迎|歎迎|藪迎|裁迎|鐵迎|欽迎|歓迁|藪迁|裁迁|鐵迁|欽迁"), "週報"),
+    (re.compile(r"歓迎"), "週報"),
 ]
 
 DEFAULT_BODY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -140,7 +157,6 @@ def extract_kind(
 
 # ---- ファイル名サニタイズ ----
 _INVALID_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
-_KEEP_CHARS = re.compile(r'[一-龥々ぁ-んァ-ヶー〜～0-9０-９a-zA-Z\s\-_]')
 
 
 def sanitize_filename(name: str, max_length: int = 80) -> str:
@@ -151,3 +167,53 @@ def sanitize_filename(name: str, max_length: int = 80) -> str:
     s = re.sub(r"\s+", "_", s)
     s = s.rstrip(". ")
     return s[:max_length]
+
+
+# ---- プロファイル読み込み ----
+
+def load_profile(
+    path: Path,
+) -> tuple[list[tuple[re.Pattern[str], str]], list[tuple[re.Pattern[str], str]]]:
+    """TOML プロファイルファイルを読み込み、(title_patterns, body_patterns) を返す。
+
+    各要素は (コンパイル済み正規表現, ラベル文字列) のタプル。
+    フォーマットエラー時は ValueError を送出。
+    tomllib が利用できない場合は ImportError を送出。
+    """
+    if tomllib is None:
+        raise ImportError(
+            "TOML サポートには Python 3.11+ または `pip install tomli` が必要です"
+        )
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    title_patterns = [
+        (re.compile(entry["pattern"]), entry["label"])
+        for entry in data.get("title_patterns", [])
+    ]
+    body_patterns = [
+        (re.compile(entry["pattern"]), entry["label"])
+        for entry in data.get("body_patterns", [])
+    ]
+    return title_patterns, body_patterns
+
+
+def load_mojibake_map(path: Path) -> dict[str, str]:
+    """TOML ファイルから mojibake 置換マップを読み込む。
+
+    TOML フォーマット:
+        [[replacements]]
+        wrong = "X"
+        correct = "Y"
+
+    戻り値: {wrong: correct} の dict。
+    """
+    if tomllib is None:
+        raise ImportError(
+            "TOML サポートには Python 3.11+ または `pip install tomli` が必要です"
+        )
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    result: dict[str, str] = {}
+    for entry in data.get("replacements", []):
+        result[entry["wrong"]] = entry["correct"]
+    return result

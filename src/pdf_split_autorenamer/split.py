@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from .pdfio import save_pdf_pages
@@ -57,18 +58,22 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
     for pdf_name, items in groups.items():
         src = src_dir / pdf_name
         if not src.exists():
+            logging.warning("PDF not found, skipping: %s", pdf_name)
             summary["actions"].append(
                 {"src": pdf_name, "status": "missing"}
             )
             continue
         import fitz
-        with fitz.open(src) as src_doc:
+        with fitz.open(stream=src.read_bytes(), filetype="pdf") as src_doc:
             page_count = src_doc.page_count
         summary["total_input_pages"] += page_count
 
         for idx, it in enumerate(items, start=1):
             a, b = it["range"]
             if a < 1 or b > page_count or a > b:
+                logging.warning(
+                    "out-of-range group skipped: %s pages %s-%s", pdf_name, a, b
+                )
                 summary["actions"].append({
                     "src": pdf_name, "range": [a, b],
                     "status": "out-of-range",
@@ -96,6 +101,7 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
                     summary["files_written"] += 1
                     summary["total_output_pages"] += (b - a + 1)
                 except Exception as e:
+                    logging.error("failed to write %s: %s", out_name, e)
                     action["status"] = f"error: {e}"
             summary["actions"].append(action)
 

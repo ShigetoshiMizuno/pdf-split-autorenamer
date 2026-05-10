@@ -1,0 +1,78 @@
+# 教会書類用プロファイル（デフォルト設定と同等）
+name = "church"
+
+[[title_patterns]]
+pattern = "主日礼拝.{0,8}メッセージ要[旨約]|主日礼拝メッセージ"
+label = "主日礼拝メッセージ要旨"
+
+[[title_patterns]]
+pattern = "水曜礼拝.{0,8}メッセージ要[旨約]"
+label = "水曜礼拝メッセージ要旨"
+
+[[title_patterns]]
+pattern = "会計報告"
+label = "会計報告"
+
+[[title_patterns]]
+pattern = "教会総会"
+label = "教会総会"
+
+[[title_patterns]]
+pattern = "イースター礼拝"
+label = "イースター礼拝"
+
+[[title_patterns]]
+pattern = "クリスマス礼拝"
+label = "クリスマス礼拝"
+
+[[title_patterns]]
+pattern = "感謝祭"
+label = "感謝祭"
+
+[[title_patterns]]
+pattern = "週報"
+label = "週報"
+
+[[title_patterns]]
+pattern = "歓迎"
+label = "週報"
+
+[[body_patterns]]
+pattern = "主日礼拝.{0,8}メッセージ要[旨約]"
+label = "主日礼拝メッセージ要旨"
+
+[[body_patterns]]
+pattern = "水曜礼拝.{0,8}メッセージ要[旨約]"
+label = "水曜礼拝メッセージ要旨"
+
+[[body_patterns]]
+pattern = "イースター礼拝"
+label = "イースター礼拝"
+
+[[body_patterns]]
+pattern = "クリスマス礼拝"
+label = "クリスマス礼拝"
+
+[[body_patterns]]
+pattern = "祈祷会|祈り会"
+label = "祈祷会"
+
+[[body_patterns]]
+pattern = "学び会"
+label = "学び会"
+
+[[body_patterns]]
+pattern = "教会学校.{0,4}シニア科|シニア科"
+label = "教会学校シニア科"
+
+[[body_patterns]]
+pattern = "教会学校"
+label = "教会学校"
+
+[[body_patterns]]
+pattern = "主日礼拝|聖日礼拝|水曜礼拝"
+label = "週報"
+
+[[body_patterns]]
+pattern = "お知らせ|お和らせ"
+label = "お知らせ"

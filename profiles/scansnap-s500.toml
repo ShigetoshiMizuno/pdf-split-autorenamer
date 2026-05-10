@@ -1,0 +1,54 @@
+# ScanSnap S500 固有の OCR 誤読修正マップ
+# load_mojibake_map() で読み込み、fix_mojibake() の extra_map に渡して使用する。
+#
+# 使用例:
+#   from pdf_split_autorenamer.textops import load_mojibake_map, fix_mojibake
+#   extra = load_mojibake_map(Path("profiles/scansnap-s500.toml"))
+#   fixed = fix_mojibake(text, extra_map=extra)
+
+[meta]
+name = "scansnap-s500"
+description = "ScanSnap S500 固有の OCR 誤読パターン（コード既定値と同等）"
+
+# --- 基本誤読 ---
+[[replacements]]
+wrong = "朁"
+correct = "月"
+
+[[replacements]]
+wrong = "拁"
+correct = "拝"
+
+[[replacements]]
+wrong = "紁"
+correct = "旨"
+
+[[replacements]]
+wrong = "迁"
+correct = "迎"
+
+[[replacements]]
+wrong = "曁"
+correct = "曜"
+
+# --- 「歓」の OCR 誤読バリアント ---
+# 「歓迎」が 歎迎 / 藪迎 / 裁迎 / 鐵迎 / 欽迎 などと誤読される
+[[replacements]]
+wrong = "歎"
+correct = "歓"
+
+[[replacements]]
+wrong = "藪"
+correct = "歓"
+
+[[replacements]]
+wrong = "裁"
+correct = "歓"
+
+[[replacements]]
+wrong = "鐵"
+correct = "歓"
+
+[[replacements]]
+wrong = "欽"
+correct = "歓"

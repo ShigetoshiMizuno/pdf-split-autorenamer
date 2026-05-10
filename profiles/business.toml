@@ -1,0 +1,30 @@
+# 一般業務書類用プロファイル（サンプル）
+name = "business"
+
+[[title_patterns]]
+pattern = "請求書"
+label = "請求書"
+
+[[title_patterns]]
+pattern = "見積書|見積もり"
+label = "見積書"
+
+[[title_patterns]]
+pattern = "契約書"
+label = "契約書"
+
+[[title_patterns]]
+pattern = "議事録"
+label = "議事録"
+
+[[title_patterns]]
+pattern = "報告書"
+label = "報告書"
+
+[[body_patterns]]
+pattern = "納品書"
+label = "納品書"
+
+[[body_patterns]]
+pattern = "領収書"
+label = "領収書"
