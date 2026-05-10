@@ -246,3 +246,44 @@ class TestHandlerOptions:
         handler.do_OPTIONS()
 
         assert 204 in handler._responses
+
+
+# ---------------------------------------------------------------------------
+# _PSARHandler.log_message (line 21)
+# ---------------------------------------------------------------------------
+
+class TestHandlerLogMessage:
+    def test_log_message_does_not_raise(self, tmp_path):
+        """log_message が logging.debug に委譲し例外を起こさない（line 21）"""
+        import logging
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        handler = _make_handler("GET", "/", work_dir)
+        # 直接呼び出して logging.debug を通ることを確認
+        with patch("logging.debug") as mock_debug:
+            handler.log_message("GET %s %s", "/", "200")
+        mock_debug.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# serve_report — auto_open=True (line 95)
+# ---------------------------------------------------------------------------
+
+class TestServeReportAutoOpen:
+    def test_auto_open_starts_timer(self, tmp_path):
+        """auto_open=True のとき Timer が開始される（line 95）"""
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        (work_dir / "report.html").write_text("<html/>", encoding="utf-8")
+
+        mock_httpd = MagicMock()
+        mock_httpd.serve_forever.side_effect = KeyboardInterrupt
+
+        mock_timer = MagicMock()
+
+        with patch("pdf_split_autorenamer.server.HTTPServer", return_value=mock_httpd):
+            with patch("pdf_split_autorenamer.server.Timer", return_value=mock_timer) as mock_timer_cls:
+                serve_report(tmp_path, work_dir=work_dir, port=9998, auto_open=True)
+
+        mock_timer_cls.assert_called_once()
+        mock_timer.start.assert_called_once()
