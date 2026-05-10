@@ -253,3 +253,76 @@ class TestSanitizeFilename:
         """連続する空白は 1つの _ になる"""
         result = sanitize_filename("a   b")
         assert result == "a_b"
+
+
+# ---------------------------------------------------------------------------
+# load_profile
+# ---------------------------------------------------------------------------
+
+class TestLoadProfile:
+    def test_load_profile_basic(self, tmp_path):
+        """TOML プロファイルを読み込めること"""
+        from pdf_split_autorenamer.textops import load_profile
+        toml_content = (
+            '[[title_patterns]]\npattern = "週報"\nlabel = "週報"\n\n'
+            '[[body_patterns]]\npattern = "祈祷会"\nlabel = "祈祷会"\n'
+        ).encode("utf-8")
+        p = tmp_path / "profile.toml"
+        p.write_bytes(toml_content)
+        title_pats, body_pats = load_profile(p)
+        assert len(title_pats) == 1
+        assert len(body_pats) == 1
+        assert title_pats[0][1] == "週報"
+        assert body_pats[0][1] == "祈祷会"
+
+    def test_load_profile_empty(self, tmp_path):
+        """空の TOML でも空リストを返すこと"""
+        from pdf_split_autorenamer.textops import load_profile
+        p = tmp_path / "empty.toml"
+        p.write_bytes(b"")
+        title_pats, body_pats = load_profile(p)
+        assert title_pats == []
+        assert body_pats == []
+
+    def test_load_profile_raises_when_no_tomllib(self, tmp_path):
+        """tomllib が None のとき ImportError を送出する（L191）"""
+        from unittest.mock import patch
+        from pdf_split_autorenamer.textops import load_profile
+        p = tmp_path / "profile.toml"
+        p.write_bytes(b"")
+        with patch("pdf_split_autorenamer.textops.tomllib", None):
+            with pytest.raises(ImportError, match="TOML"):
+                load_profile(p)
+
+
+# ---------------------------------------------------------------------------
+# load_mojibake_map
+# ---------------------------------------------------------------------------
+
+class TestLoadMojibakeMap:
+    def test_load_mojibake_map_basic(self, tmp_path):
+        """TOML から置換マップを読み込めること"""
+        from pdf_split_autorenamer.textops import load_mojibake_map
+        toml_content = '[[replacements]]\nwrong = "朁"\ncorrect = "月"\n'.encode("utf-8")
+        p = tmp_path / "mojibake.toml"
+        p.write_bytes(toml_content)
+        result = load_mojibake_map(p)
+        assert result == {"朁": "月"}
+
+    def test_load_mojibake_map_empty(self, tmp_path):
+        """空の TOML では空 dict を返すこと"""
+        from pdf_split_autorenamer.textops import load_mojibake_map
+        p = tmp_path / "empty.toml"
+        p.write_bytes(b"")
+        result = load_mojibake_map(p)
+        assert result == {}
+
+    def test_load_mojibake_map_raises_when_no_tomllib(self, tmp_path):
+        """tomllib が None のとき ImportError を送出する（L218）"""
+        from unittest.mock import patch
+        from pdf_split_autorenamer.textops import load_mojibake_map
+        p = tmp_path / "mojibake.toml"
+        p.write_bytes(b"")
+        with patch("pdf_split_autorenamer.textops.tomllib", None):
+            with pytest.raises(ImportError, match="TOML"):
+                load_mojibake_map(p)
