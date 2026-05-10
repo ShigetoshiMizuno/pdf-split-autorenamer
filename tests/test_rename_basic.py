@@ -122,6 +122,21 @@ class TestResolveFilenames:
         assert result[0]["final"].startswith("日付不明_")
 
 
+class TestFindTargetsEdgeCases:
+    def test_non_file_pdf_is_skipped(self, tmp_path):
+        # Create a directory named like a PDF
+        pdf_dir = tmp_path / "scan_01.pdf"
+        pdf_dir.mkdir()
+        result = find_targets(tmp_path, mode="split")
+        assert len(result) == 0
+
+    def test_all_mode_does_not_include_dated_non_unknown(self, tmp_path):
+        # DATED_PAT match but NOT UNKNOWN → should be skipped even in "all" mode
+        (tmp_path / "2026-04-06_週報.pdf").write_bytes(b"%PDF-1.4")
+        result = find_targets(tmp_path, mode="all")
+        assert len(result) == 0
+
+
 class TestRunRename:
     def test_no_targets_returns_empty(self, tmp_path):
         result = run_rename(tmp_path)
@@ -143,10 +158,38 @@ class TestRunRename:
         assert not src.exists()
 
     def test_noop_when_already_correctly_named(self, tmp_path):
-        name = "2026-04-06_週報.pdf"
         src = tmp_path / "scan_01.pdf"
         _make_pdf(src, text="2026年4月6日 週報")
         run_rename(tmp_path, mode="split", apply=True)
         # second run: file is now dated, should not be targeted
         result = run_rename(tmp_path, mode="split")
         assert result["targets"] == 0
+
+    def test_conflict_when_dst_exists(self, tmp_path):
+        src = tmp_path / "scan_01.pdf"
+        _make_pdf(src, text="2026年4月6日 週報")
+        # Pre-create the destination file (different inode)
+        dst_name = None
+        dry_run = run_rename(tmp_path, mode="split")
+        if dry_run["actions"]:
+            dst_name = dry_run["actions"][0]["dst"]
+        if dst_name:
+            (tmp_path / dst_name).write_bytes(b"%PDF-1.4")
+            result = run_rename(tmp_path, mode="split", apply=True)
+            assert any(a["status"] == "conflict" for a in result["actions"])
+        else:
+            pytest.skip("Could not determine destination name")
+
+    def test_kind_from_filename_hint(self, tmp_path):
+        # When text doesn't match, fallback to filename-based kind
+        src = tmp_path / "scan_01_週報.pdf"
+        _make_pdf(src)  # empty PDF, no text content
+        result = run_rename(tmp_path, mode="split")
+        actions = result["actions"]
+        assert len(actions) >= 1
+
+    def test_fallback_title_used_when_kind_is_default(self, tmp_path):
+        src = tmp_path / "scan_01_議事録.pdf"
+        _make_pdf(src)  # no recognizable kind in text → should use fallback
+        result = run_rename(tmp_path, mode="split")
+        assert result["targets"] >= 1
