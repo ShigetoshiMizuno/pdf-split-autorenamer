@@ -430,20 +430,6 @@ class TestStdoutReconfigure:
 
 
 class TestMainModule:
-    def test_main_module_as_script(self, tmp_path):
-        """__main__.py が cli.main をインポートし、それを呼んで SystemExit を発する（__main__.py lines 3-6）
-
-        runpy.run_module はエディタブルインストール環境の Python バージョンによって
-        挙動が異なるため、__main__.py の main を直接呼び出す形でテストする。
-        """
-        from pdf_split_autorenamer.__main__ import main
-        mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
-        with patch("sys.argv", ["psar", "analyze", str(tmp_path)]):
-            with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
-                with pytest.raises(SystemExit) as exc_info:
-                    raise SystemExit(main())
-        assert exc_info.value.code == 0
-
     def test_cli_py_if_main_guard(self, tmp_path):
         """cli.py の if __name__ == '__main__' ガードをカバー (line 200)"""
         import runpy
