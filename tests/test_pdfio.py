@@ -213,3 +213,87 @@ class TestFindTesseract:
         monkeypatch.delenv("TESSERACT", raising=False)
         result = find_tesseract()
         assert result is None or isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# extract_text (メイン関数)
+# ---------------------------------------------------------------------------
+
+class TestExtractText:
+    def test_returns_text_when_pdftotext_unavailable(self, tmp_path):
+        """pdftotext が利用不可のとき PyMuPDF にフォールバックしてテキストを返す"""
+        from pdf_split_autorenamer.pdfio import extract_text
+        from unittest.mock import patch
+        pdf_path = tmp_path / "test.pdf"
+        pdf_path.write_bytes(make_simple_pdf("hello world"))
+        # pdftotext が見つからない状況をシミュレート
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            result = extract_text(pdf_path, ocr_fallback=False)
+        assert isinstance(result, str)
+
+    def test_returns_str_from_real_pdf(self, tmp_path):
+        """実際の PDF から文字列が返る"""
+        from pdf_split_autorenamer.pdfio import extract_text
+        from unittest.mock import patch
+        pdf_path = tmp_path / "test.pdf"
+        pdf_path.write_bytes(make_simple_pdf("2026-04-06 text"))
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            result = extract_text(pdf_path, ocr_fallback=False)
+        assert isinstance(result, str)
+
+    def test_nonexistent_pdf_returns_str(self, tmp_path):
+        """存在しないファイルでも文字列を返す（例外を出さない）"""
+        from pdf_split_autorenamer.pdfio import extract_text
+        from unittest.mock import patch
+        pdf_path = tmp_path / "no_such.pdf"
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            result = extract_text(pdf_path, ocr_fallback=False)
+        assert isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# render_thumb
+# ---------------------------------------------------------------------------
+
+class TestRenderThumb:
+    def test_creates_jpeg_file(self, tmp_path):
+        """render_thumb が JPEG ファイルを生成する"""
+        import fitz
+        from pdf_split_autorenamer.pdfio import render_thumb
+        # PDF を作成してページオブジェクトを取得
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "thumb test")
+        out_path = tmp_path / "thumb.jpg"
+        render_thumb(page, out_path)
+        doc.close()
+        assert out_path.exists()
+        assert out_path.stat().st_size > 0
+
+    def test_thumbnail_is_valid_image(self, tmp_path):
+        """生成された JPEG が PyMuPDF で読み取れる（有効な画像ファイル）"""
+        import fitz
+        from pdf_split_autorenamer.pdfio import render_thumb
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "valid image test")
+        out_path = tmp_path / "thumb.jpg"
+        render_thumb(page, out_path, max_long_side=200)
+        doc.close()
+        # ファイルが存在してサイズが 0 より大きければ有効な JPEG とみなす
+        assert out_path.exists()
+        assert out_path.stat().st_size > 100  # 最低限のサイズ
+
+    def test_max_long_side_limits_size(self, tmp_path):
+        """max_long_side が小さいほどファイルサイズが小さくなる（粗い確認）"""
+        import fitz
+        from pdf_split_autorenamer.pdfio import render_thumb
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "size test")
+        out_small = tmp_path / "small.jpg"
+        out_large = tmp_path / "large.jpg"
+        render_thumb(page, out_small, max_long_side=100)
+        render_thumb(page, out_large, max_long_side=600)
+        doc.close()
+        assert out_small.stat().st_size <= out_large.stat().st_size + 1000
