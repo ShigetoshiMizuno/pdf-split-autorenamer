@@ -28,6 +28,9 @@ dependencies = [
     "PyMuPDF>=1.23",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
 [project.urls]
 Homepage = "https://github.com/ShigetoshiMizuno/pdf-split-autorenamer"
 Issues = "https://github.com/ShigetoshiMizuno/pdf-split-autorenamer/issues"
