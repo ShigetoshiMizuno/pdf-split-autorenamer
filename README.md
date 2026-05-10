@@ -149,9 +149,17 @@ OCR 誤読マップは `profiles/scansnap-s500.toml` を参照してください
 
 MIT License — 詳細は [LICENSE](LICENSE) を参照してください。
 
-## OCR フォールバック
+## OCR パイプライン
 
-テキストレイヤーなしの画像PDFには、Tesseract OCR が自動的に使われます。
+テキストレイヤーなしの画像 PDF には、3 段階の OCR パイプラインが自動的に使われます。
+
+### Stage 1: pdftotext / PyMuPDF（追加インストール不要）
+
+テキストレイヤーあり PDF はそのまま高速処理します。
+
+### Stage 2: Tesseract OCR（手動インストール必要）
+
+Stage 1 で日本語テキストが取得できなかったページは自動的に Tesseract にフォールバック。
 
 ```sh
 # Tesseract をインストール後、日本語用データも追加
@@ -162,6 +170,30 @@ MIT License — 詳細は [LICENSE](LICENSE) を参照してください。
 # OCR フォールバックを無効化したい場合
 psar analyze ./scanned_pdfs --no-ocr-fallback
 ```
+
+### Stage 3: LLM Vision / PaddleOCR / EasyOCR（オプション）
+
+手書き・縦書き・低解像度スキャンには `--ocr-strategy` を指定します。
+
+```sh
+# Claude Vision（クラウド API、精度最高）
+pip install "pdf-split-autorenamer[llm]"
+export ANTHROPIC_API_KEY=sk-ant-...
+psar analyze ./scanned_pdfs --ocr-strategy llm
+
+# EasyOCR（ローカル、PyTorch ベース）
+pip install "pdf-split-autorenamer[easyocr]"
+
+# PaddleOCR（ローカル、縦書きに強い）
+pip install "pdf-split-autorenamer[paddle]"
+```
+
+| `--ocr-strategy` | 動作 |
+|-----------------|------|
+| `fast` | Stage 1 のみ（テキスト層 PDF 専用） |
+| `balanced` | Stage 1 → テキスト空時 Stage 2（既定） |
+| `roi` | Stage 1 → 品質低時 Stage 2（ROI クロップ） |
+| `llm` | Stage 1 → 2 → Claude LLM Vision の順に試行 |
 
 ## 注意
 
