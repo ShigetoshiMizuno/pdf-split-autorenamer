@@ -422,12 +422,29 @@ function buildGroupsFromFlags() {
 }
 function saveJson() {
   const data = buildGroupsFromFlags();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'groups.json'; a.click();
-  URL.revokeObjectURL(url);
-  alert('groups.json をダウンロードしました。\n作業ディレクトリ (.psar) に上書き保存してから\n分割を実行してください。');
+  const jsonStr = JSON.stringify(data, null, 2);
+  if (window.location.protocol === 'http:') {
+    // psar serve モード: サーバーに直接保存
+    fetch('/api/save-groups', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: jsonStr
+    }).then(r => {
+      if (r.ok) {
+        alert('groups.json を保存しました。\n分割を実行するには psar split を実行してください。');
+      } else {
+        r.text().then(t => alert('保存失敗: ' + t));
+      }
+    }).catch(e => alert('保存失敗: ' + e));
+  } else {
+    // file:// プロトコル: 従来のダウンロード
+    const blob = new Blob([jsonStr], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'groups.json'; a.click();
+    URL.revokeObjectURL(url);
+    alert('groups.json をダウンロードしました。\n作業ディレクトリ (.psar) に上書き保存してから\n分割を実行してください。');
+  }
 }
 function resetGroups() {
   if (!confirm('初期境界とファイル名を初期状態に戻します。よろしいですか?')) return;

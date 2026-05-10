@@ -109,6 +109,18 @@ def cmd_rename(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from . import server
+    src = Path(args.folder).resolve()
+    work = Path(args.work_dir).resolve() if args.work_dir else None
+    try:
+        server.serve_report(src, work_dir=work, port=args.port, auto_open=not args.no_open)
+    except FileNotFoundError as e:
+        logging.error("%s", e)
+        return 2
+    return 0
+
+
 def cmd_gui(args: argparse.Namespace) -> int:
     from . import gui
     return gui.main(initial_folder=args.folder)
@@ -163,6 +175,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_rename)
+
+    sp = sub.add_parser("serve", help="report.html をローカルHTTPで配信（groups.json 直接保存）")
+    sp.add_argument("folder", help="PDFが入っているフォルダ")
+    sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
+    sp.add_argument("--port", type=int, default=8765, help="HTTPポート番号 (既定: 8765)")
+    sp.add_argument("--no-open", action="store_true", help="ブラウザを自動で開かない")
+    sp.set_defaults(func=cmd_serve)
 
     sp = sub.add_parser("gui", help="Tkinter GUI を起動")
     sp.add_argument("--folder", help="初期フォルダ")
