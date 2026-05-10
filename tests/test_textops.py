@@ -204,6 +204,27 @@ class TestExtractKind:
         """空文字列はデフォルト種別を返す"""
         assert extract_kind("") == "書類"
 
+    def test_body_only_match_returns_correct_kind(self):
+        """タイトル領域（先頭6行）にはマッチしないが本文にはマッチする場合、body_patterns で判定される"""
+        # 先頭6行にはマッチしないよう無関係なテキストを7行並べ、本文に '主日礼拝メッセージ要旨' を入れる
+        padding = "\n".join([f"行{i}：無関係なテキスト" for i in range(1, 8)])
+        text = padding + "\n主日礼拝メッセージ要旨\n説教原稿"
+        assert extract_kind(text) == "主日礼拝メッセージ要旨"
+
+    def test_fix_broken_unicode_no_recovery_returns_original(self):
+        """fix_broken_unicode: 典型化け文字を含むが復元できない場合は元の文字列を返す"""
+        from pdf_split_autorenamer.textops import fix_broken_unicode
+        # 'ç' はフィルタを通過するが、cp1252→UTF-8 デコードで日本語を生成しない
+        result = fix_broken_unicode("ç")
+        assert result == "ç"
+
+    def test_fix_broken_unicode_encode_error_skipped(self):
+        """fix_broken_unicode: cp1252 でエンコードできない文字を含む場合もクラッシュしない"""
+        from pdf_split_autorenamer.textops import fix_broken_unicode
+        # 'ç' + 日本語: cp1252 エンコード失敗 → UnicodeEncodeError ハンドラを通過して元文字列を返す
+        result = fix_broken_unicode("ç日本語")
+        assert isinstance(result, str)
+
 
 # ---------------------------------------------------------------------------
 # sanitize_filename
