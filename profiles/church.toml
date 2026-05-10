@@ -34,7 +34,7 @@ pattern = "週報"
 label = "週報"
 
 [[title_patterns]]
-pattern = "歓迎|歎迎|藪迎|裁迎|鐵迎|欽迎|歓迁|藪迁|裁迁|鐵迁|欽迁"
+pattern = "歓迎"
 label = "週報"
 
 [[body_patterns]]
