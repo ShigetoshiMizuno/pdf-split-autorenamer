@@ -76,9 +76,13 @@ class TesseractBackend(OcrBackend):
 
 
 class PaddleOCRBackend(OcrBackend):
-    """PaddleOCR バックエンド（スタブ）。
+    """PaddleOCR バックエンド。
 
-    有効化: pip install paddleocr
+    有効化: pip install "pdf-split-autorenamer[paddle]"
+    インストール: pip install paddleocr paddlepaddle
+
+    PaddleOCR は日本語縦書き・手書き文字に強い。
+    初回実行時にモデルファイル（~数百 MB）をダウンロードする。
     """
 
     def is_available(self) -> bool:
@@ -89,9 +93,69 @@ class PaddleOCRBackend(OcrBackend):
             return False
 
     def extract_text(self, image_bytes: bytes, lang: str = "jpn") -> str:
-        raise NotImplementedError(
-            "PaddleOCRBackend は未実装です。T-13 で実装予定。"
-        )
+        try:
+            from paddleocr import PaddleOCR  # type: ignore[import-untyped]
+        except ImportError:  # pragma: no cover
+            return ""
+
+        paddle_lang = "japan" if lang == "jpn" else lang
+        try:
+            ocr = PaddleOCR(
+                use_angle_cls=True,
+                lang=paddle_lang,
+                show_log=False,
+            )
+            result = ocr.ocr(image_bytes, cls=True)
+            if not result or not result[0]:
+                return ""
+            lines = []
+            for line in result[0]:
+                if line and len(line) >= 2:
+                    text_conf = line[1]
+                    if isinstance(text_conf, (list, tuple)) and len(text_conf) >= 1:
+                        lines.append(str(text_conf[0]))
+            return "\n".join(lines)
+        except Exception as e:
+            import logging
+            logging.warning("PaddleOCR エラー: %s", e)
+            return ""
+
+
+class EasyOCRBackend(OcrBackend):
+    """EasyOCR バックエンド。
+
+    有効化: pip install "pdf-split-autorenamer[easyocr]"
+    インストール: pip install easyocr
+
+    EasyOCR は PyTorch ベースの OCR エンジン。日本語・英語・多言語に対応。
+    初回実行時にモデルファイル（~数百 MB）をダウンロードする。
+    """
+
+    def is_available(self) -> bool:
+        try:
+            import easyocr  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def extract_text(self, image_bytes: bytes, lang: str = "jpn") -> str:
+        try:
+            import easyocr  # type: ignore[import-untyped]
+        except ImportError:  # pragma: no cover
+            return ""
+
+        easy_lang = ["ja"] if lang == "jpn" else [lang]
+        try:
+            import io
+            from PIL import Image  # type: ignore[import-untyped]
+            img = Image.open(io.BytesIO(image_bytes))
+            reader = easyocr.Reader(easy_lang, gpu=False, verbose=False)
+            results = reader.readtext(img, detail=0, paragraph=True)
+            return "\n".join(str(r) for r in results)
+        except Exception as e:
+            import logging
+            logging.warning("EasyOCR エラー: %s", e)
+            return ""
 
 
 class AzureReadBackend(OcrBackend):

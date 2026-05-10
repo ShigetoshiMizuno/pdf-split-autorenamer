@@ -143,7 +143,6 @@ class TestStubBackends:
         assert issubclass(cls, OcrBackend)
 
     @pytest.mark.parametrize("cls_name", [
-        "PaddleOCRBackend",
         "AzureReadBackend",
         "GoogleVisionBackend",
     ])
@@ -523,3 +522,125 @@ class TestValidateStructuredOutput:
         from pdf_split_autorenamer.ocr_backend import validate_structured_output
         result = validate_structured_output({"date": None, "title": None})
         assert result["title"] is None
+
+
+# ---------------------------------------------------------------------------
+# PaddleOCRBackend（T-13）
+# ---------------------------------------------------------------------------
+
+class TestPaddleOCRBackend:
+    def test_extract_text_returns_empty_when_not_installed(self, monkeypatch):
+        """paddleocr 未インストール時は空文字を返す"""
+        import sys
+        from pdf_split_autorenamer.ocr_backend import PaddleOCRBackend
+        monkeypatch.setitem(sys.modules, "paddleocr", None)  # type: ignore[arg-type]
+        backend = PaddleOCRBackend()
+        result = backend.extract_text(b"fake_image")
+        assert result == ""
+
+    def test_extract_text_success_with_mock(self, monkeypatch):
+        """paddleocr が利用可能な場合、テキストを結合して返す"""
+        import sys
+        from unittest.mock import MagicMock
+        fake_paddle_mod = MagicMock()
+        fake_ocr_instance = MagicMock()
+        fake_paddle_mod.PaddleOCR.return_value = fake_ocr_instance
+        fake_ocr_instance.ocr.return_value = [
+            [
+                [[0, 0, 1, 1], ("2026年4月6日", 0.99)],
+                [[0, 20, 1, 40], ("主日礼拝", 0.95)],
+            ]
+        ]
+        monkeypatch.setitem(sys.modules, "paddleocr", fake_paddle_mod)
+        from pdf_split_autorenamer.ocr_backend import PaddleOCRBackend
+        backend = PaddleOCRBackend()
+        result = backend.extract_text(b"fake_image")
+        assert "2026年4月6日" in result
+        assert "主日礼拝" in result
+
+    def test_extract_text_empty_result(self, monkeypatch):
+        """OCR 結果が空の場合は空文字を返す"""
+        import sys
+        from unittest.mock import MagicMock
+        fake_paddle_mod = MagicMock()
+        fake_ocr_instance = MagicMock()
+        fake_paddle_mod.PaddleOCR.return_value = fake_ocr_instance
+        fake_ocr_instance.ocr.return_value = [None]
+        monkeypatch.setitem(sys.modules, "paddleocr", fake_paddle_mod)
+        from pdf_split_autorenamer.ocr_backend import PaddleOCRBackend
+        backend = PaddleOCRBackend()
+        result = backend.extract_text(b"fake_image")
+        assert result == ""
+
+    def test_extract_text_exception_returns_empty(self, monkeypatch):
+        """OCR 実行時に例外が発生した場合は空文字を返す"""
+        import sys
+        from unittest.mock import MagicMock
+        fake_paddle_mod = MagicMock()
+        fake_paddle_mod.PaddleOCR.side_effect = RuntimeError("GPU エラー")
+        monkeypatch.setitem(sys.modules, "paddleocr", fake_paddle_mod)
+        from pdf_split_autorenamer.ocr_backend import PaddleOCRBackend
+        backend = PaddleOCRBackend()
+        result = backend.extract_text(b"fake_image")
+        assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# EasyOCRBackend（T-13）
+# ---------------------------------------------------------------------------
+
+class TestEasyOCRBackend:
+    def test_is_available_false_when_not_installed(self, monkeypatch):
+        """easyocr 未インストール時は False"""
+        import sys
+        monkeypatch.setitem(sys.modules, "easyocr", None)  # type: ignore[arg-type]
+        from pdf_split_autorenamer.ocr_backend import EasyOCRBackend
+        backend = EasyOCRBackend()
+        assert backend.is_available() is False
+
+    def test_is_available_true_when_installed(self, monkeypatch):
+        """easyocr がインポートできる場合は True"""
+        import sys
+        from unittest.mock import MagicMock
+        monkeypatch.setitem(sys.modules, "easyocr", MagicMock())
+        from pdf_split_autorenamer.ocr_backend import EasyOCRBackend
+        backend = EasyOCRBackend()
+        assert backend.is_available() is True
+
+    def test_extract_text_returns_empty_when_not_installed(self, monkeypatch):
+        """easyocr 未インストール時は空文字を返す"""
+        import sys
+        monkeypatch.setitem(sys.modules, "easyocr", None)  # type: ignore[arg-type]
+        from pdf_split_autorenamer.ocr_backend import EasyOCRBackend
+        backend = EasyOCRBackend()
+        result = backend.extract_text(b"fake_image")
+        assert result == ""
+
+    def test_extract_text_success_with_mock(self, monkeypatch):
+        """easyocr が利用可能な場合、テキストを結合して返す"""
+        import sys
+        from unittest.mock import MagicMock, patch
+        fake_easyocr = MagicMock()
+        fake_reader = MagicMock()
+        fake_easyocr.Reader.return_value = fake_reader
+        fake_reader.readtext.return_value = ["2026年4月6日", "主日礼拝"]
+        monkeypatch.setitem(sys.modules, "easyocr", fake_easyocr)
+        with patch("PIL.Image.open") as mock_open:
+            mock_open.return_value = MagicMock()
+            from pdf_split_autorenamer.ocr_backend import EasyOCRBackend
+            backend = EasyOCRBackend()
+            result = backend.extract_text(b"fake_image")
+        assert "2026年4月6日" in result
+        assert "主日礼拝" in result
+
+    def test_extract_text_exception_returns_empty(self, monkeypatch):
+        """OCR 実行時に例外が発生した場合は空文字を返す"""
+        import sys
+        from unittest.mock import MagicMock
+        fake_easyocr = MagicMock()
+        fake_easyocr.Reader.side_effect = RuntimeError("モデル読み込みエラー")
+        monkeypatch.setitem(sys.modules, "easyocr", fake_easyocr)
+        from pdf_split_autorenamer.ocr_backend import EasyOCRBackend
+        backend = EasyOCRBackend()
+        result = backend.extract_text(b"fake_image")
+        assert result == ""
