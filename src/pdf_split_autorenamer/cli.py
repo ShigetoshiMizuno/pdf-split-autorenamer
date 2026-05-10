@@ -85,9 +85,11 @@ def cmd_rename(args: argparse.Namespace) -> int:
         mode = "all"
     else:
         mode = "split"
+    profile = Path(args.profile) if args.profile else None
     res = rename.run_rename(src, mode=mode, apply=args.apply,
                             pdftotext_path=args.pdftotext,
-                            ocr_fallback=not args.no_ocr_fallback)
+                            ocr_fallback=not args.no_ocr_fallback,
+                            profile=profile)
     print(f"対象: {res['targets']} 件 / モード: {mode}")
     print()
     print(f"{'STATUS':10} OLD -> NEW")
@@ -148,6 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--pdftotext", help="pdftotext.exe のパス (省略時は自動検出)")
     sp.add_argument("--no-ocr-fallback", action="store_true",
                     help="Tesseract による OCR フォールバックを無効化")
+    sp.add_argument("--profile", help="書類タイプ判定プロファイル TOML のパス")
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_rename)

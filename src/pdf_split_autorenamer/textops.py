@@ -3,6 +3,15 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib  # type: ignore[no-reattr-module]
+    except ImportError:
+        tomllib = None  # type: ignore[assignment]
 
 # OCR の頻出誤認マッピング（漢字の似た字への誤読）
 MOJIBAKE_FIX = {
@@ -150,3 +159,31 @@ def sanitize_filename(name: str, max_length: int = 80) -> str:
     s = re.sub(r"\s+", "_", s)
     s = s.rstrip(". ")
     return s[:max_length]
+
+
+# ---- プロファイル読み込み ----
+
+def load_profile(
+    path: Path,
+) -> tuple[list[tuple[re.Pattern[str], str]], list[tuple[re.Pattern[str], str]]]:
+    """TOML プロファイルファイルを読み込み、(title_patterns, body_patterns) を返す。
+
+    各要素は (コンパイル済み正規表現, ラベル文字列) のタプル。
+    フォーマットエラー時は ValueError を送出。
+    tomllib が利用できない場合は ImportError を送出。
+    """
+    if tomllib is None:
+        raise ImportError(
+            "TOML サポートには Python 3.11+ または `pip install tomli` が必要です"
+        )
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    title_patterns = [
+        (re.compile(entry["pattern"]), entry["label"])
+        for entry in data.get("title_patterns", [])
+    ]
+    body_patterns = [
+        (re.compile(entry["pattern"]), entry["label"])
+        for entry in data.get("body_patterns", [])
+    ]
+    return title_patterns, body_patterns
