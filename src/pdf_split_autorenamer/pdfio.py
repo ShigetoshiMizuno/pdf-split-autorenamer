@@ -2,6 +2,7 @@
 """PDF入出力ユーティリティ（PyMuPDF + Poppler pdftotext）"""
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import shutil
@@ -194,3 +195,42 @@ def save_pdf_pages(src_pdf: Path, from_page: int, to_page: int, out_path: Path,
 def list_pdfs(folder: Path) -> list[Path]:
     """フォルダ直下の *.pdf を返す"""
     return sorted(p for p in folder.glob("*.pdf") if p.is_file())
+
+
+def crop_page_pixmap(page: "fitz.Page", ratio: float = 0.3) -> bytes:
+    """ページ上部 ratio * 100% を PNG バイト列で返す（Stage 2 ROI OCR 用）。"""
+    rect = page.rect
+    ratio = max(0.0, min(1.0, ratio))
+    crop_height = rect.height * ratio if ratio > 0 else 1.0
+    crop_rect = fitz.Rect(rect.x0, rect.y0, rect.x1, rect.y0 + crop_height)
+    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), clip=crop_rect)
+    return pix.tobytes("png")
+
+
+def calc_japanese_ratio(text: str) -> float:
+    """テキスト中の日本語文字（U+3040〜U+9FFF）の比率を返す。空文字列は 0.0。"""
+    if not text:
+        return 0.0
+    count = sum(1 for c in text if 0x3040 <= ord(c) <= 0x9FFF)
+    return count / len(text)
+
+
+def get_ocr_cache_path(work_dir: Path, image_bytes: bytes) -> Path:
+    """image_bytes の SHA-256 ハッシュを用いて OCR キャッシュファイルパスを返す。
+    ocr_cache ディレクトリは自動作成される。"""
+    digest = hashlib.sha256(image_bytes).hexdigest()
+    cache_dir = work_dir / "ocr_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / f"{digest}.txt"
+
+
+def write_ocr_cache(cache_path: Path, text: str) -> None:
+    """OCR 結果をキャッシュファイルに書き出す。"""
+    cache_path.write_text(text, encoding="utf-8")
+
+
+def read_ocr_cache(cache_path: Path) -> str | None:
+    """キャッシュファイルが存在すれば内容を返す。なければ None。"""
+    if cache_path.exists():
+        return cache_path.read_text(encoding="utf-8")
+    return None
