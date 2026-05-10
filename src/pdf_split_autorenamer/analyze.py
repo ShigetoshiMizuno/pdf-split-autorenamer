@@ -225,6 +225,7 @@ main{ max-width:1100px; margin:0 auto; padding:16px;}
 .namebox label{ font-size:11px; color:var(--muted);}
 .namebox input{ flex:1; font-size:13px; padding:4px 6px; border:1px solid #99c; border-radius:3px; min-width:0;}
 .preview{ font-size:11px; color:#06a; margin-top:2px;}
+.ocr-empty{ background:#fff3cd; border:1px solid #ffc107; color:#856404; font-size:11px; padding:3px 6px; border-radius:3px; margin-top:4px; display:inline-block;}
 </style>
 </head>
 <body>
@@ -380,6 +381,12 @@ function render() {
     const pre = document.createElement('pre');
     pre.textContent = p.head || '(テキストなし)';
     meta.appendChild(pre);
+    if (!p.head || p.head.trim() === '') {
+      const warn = document.createElement('span');
+      warn.className = 'ocr-empty';
+      warn.textContent = '⚠ OCR テキスト空（Tesseract OCR を検討してください）';
+      meta.appendChild(warn);
+    }
     row.appendChild(meta);
     sec.appendChild(row);
   }
