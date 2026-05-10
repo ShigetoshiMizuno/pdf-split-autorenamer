@@ -42,10 +42,12 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 
 def collect_pages(src_dir: Path, thumb_dir: Path,
                   pdftotext_path: str | None = None,
-                  pdf_filter=None) -> list[dict]:
+                  pdf_filter=None,
+                  ocr_fallback: bool = True) -> list[dict]:
     """フォルダ内の各PDFを開いて、各ページのメタデータ・サムネ・OCRテキストを集める。
 
     pdf_filter: 関数 (Path) -> bool。True を返すPDFだけ対象にする。
+    ocr_fallback: True の場合、テキストが空なら Tesseract でリトライする。
     """
     thumb_dir.mkdir(parents=True, exist_ok=True)
     pdftotext_path = pdftotext_path or find_pdftotext()
@@ -67,7 +69,8 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                 thumb_path = thumb_dir / thumb_name
                 if not thumb_path.exists():
                     render_thumb(page, thumb_path)
-                text = extract_text(pdf_path, page_no, pdftotext_path)
+                text = extract_text(pdf_path, page_no, pdftotext_path,
+                                    ocr_fallback=ocr_fallback)
                 head_text = "\n".join(
                     [l for l in textops.fix_mojibake(text).splitlines() if l.strip()][:3]
                 )[:200]
@@ -434,7 +437,8 @@ render();
 
 def run_analyze(src_dir: Path, work_dir: Path | None = None,
                 pdftotext_path: str | None = None,
-                title: str = "PDF 分割レビュー") -> dict:
+                title: str = "PDF 分割レビュー",
+                ocr_fallback: bool = True) -> dict:
     """src_dir 配下のPDFを解析し、サムネ・groups.json・report.html を work_dir に出力。
     既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。"""
     src_dir = Path(src_dir)
@@ -451,7 +455,8 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
             return False
         return True
 
-    pages = collect_pages(src_dir, thumb_dir, pdftotext_path, pdf_filter=_filter)
+    pages = collect_pages(src_dir, thumb_dir, pdftotext_path, pdf_filter=_filter,
+                          ocr_fallback=ocr_fallback)
     if not pages:
         return {"pages": 0, "groups": 0}
     boundaries = build_boundary_info(pages)

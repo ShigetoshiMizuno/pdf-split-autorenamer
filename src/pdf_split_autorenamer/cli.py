@@ -34,7 +34,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     work = Path(args.work_dir).resolve() if args.work_dir else None
     print(f"Analyzing PDFs in: {src}")
     res = analyze.run_analyze(src, work_dir=work, pdftotext_path=args.pdftotext,
-                              title=args.title)
+                              title=args.title,
+                              ocr_fallback=not args.no_ocr_fallback)
     print(f"  pages: {res.get('pages', 0)}")
     print(f"  initial groups: {res.get('groups', 0)}")
     print(f"  report: {res.get('report_html', '')}")
@@ -85,7 +86,8 @@ def cmd_rename(args: argparse.Namespace) -> int:
     else:
         mode = "split"
     res = rename.run_rename(src, mode=mode, apply=args.apply,
-                            pdftotext_path=args.pdftotext)
+                            pdftotext_path=args.pdftotext,
+                            ocr_fallback=not args.no_ocr_fallback)
     print(f"対象: {res['targets']} 件 / モード: {mode}")
     print()
     print(f"{'STATUS':10} OLD -> NEW")
@@ -122,6 +124,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
     sp.add_argument("--pdftotext", help="pdftotext.exe のパス (省略時は自動検出)")
     sp.add_argument("--title", default="PDF 分割レビュー", help="HTMLレポートのタイトル")
+    sp.add_argument("--no-ocr-fallback", action="store_true",
+                    help="Tesseract による OCR フォールバックを無効化")
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_analyze)
@@ -142,6 +146,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="日付不明_*.pdf を再考対象にする")
     sp.add_argument("--all", action="store_true", help="分割直後＋日付不明 両方")
     sp.add_argument("--pdftotext", help="pdftotext.exe のパス (省略時は自動検出)")
+    sp.add_argument("--no-ocr-fallback", action="store_true",
+                    help="Tesseract による OCR フォールバックを無効化")
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_rename)

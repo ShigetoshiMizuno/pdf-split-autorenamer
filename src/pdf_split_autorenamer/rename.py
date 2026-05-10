@@ -97,12 +97,13 @@ def find_targets(src_dir: Path, mode: str = "split") -> list[Path]:
 
 
 def make_plan(targets: list[Path], pdftotext_path: str | None = None,
-              kind_default: str = "書類") -> list[dict]:
+              kind_default: str = "書類",
+              ocr_fallback: bool = True) -> list[dict]:
     """各PDFについて (date, kind, fallback_title, head) を計算する"""
     pdftotext_path = pdftotext_path or find_pdftotext()
     plan: list[dict] = []
     for p in targets:
-        text = extract_text(p, pdftotext=pdftotext_path)
+        text = extract_text(p, pdftotext=pdftotext_path, ocr_fallback=ocr_fallback)
         head = "\n".join(
             [l for l in textops.fix_mojibake(text).splitlines() if l.strip()][:3]
         )[:120]
@@ -146,7 +147,8 @@ def resolve_filenames(plan: list[dict]) -> list[dict]:
 
 def run_rename(src_dir: Path, mode: str = "split", apply: bool = False,
                pdftotext_path: str | None = None,
-               kind_default: str = "書類") -> dict:
+               kind_default: str = "書類",
+               ocr_fallback: bool = True) -> dict:
     """PDFを内容ベースで自動リネームする。
 
     mode: 'split' (分割直後) / 'unknown' (日付不明_) / 'all' (両方)
@@ -157,7 +159,8 @@ def run_rename(src_dir: Path, mode: str = "split", apply: bool = False,
     if not targets:
         return {"targets": 0, "actions": [], "applied": 0}
 
-    plan = make_plan(targets, pdftotext_path=pdftotext_path, kind_default=kind_default)
+    plan = make_plan(targets, pdftotext_path=pdftotext_path, kind_default=kind_default,
+                     ocr_fallback=ocr_fallback)
     plan = resolve_filenames(plan)
 
     actions: list[dict] = []
