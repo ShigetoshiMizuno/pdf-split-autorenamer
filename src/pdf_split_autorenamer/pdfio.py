@@ -67,7 +67,7 @@ def extract_text_pdftotext(pdf_path: Path, page_no: int | None = None,
 def extract_text_pymupdf(pdf_path: Path, page_no: int | None = None) -> str:
     """PyMuPDF で生テキストを取得（pdftotext がない場合のフォールバック）"""
     try:
-        with fitz.open(pdf_path) as doc:
+        with fitz.open(stream=pdf_path.read_bytes(), filetype="pdf") as doc:
             if page_no is not None:
                 if 1 <= page_no <= doc.page_count:
                     return doc[page_no - 1].get_text()
@@ -97,34 +97,11 @@ def render_thumb(page: fitz.Page, out_path: Path, max_long_side: int = 600,
     pix.save(str(out_path), jpg_quality=jpeg_quality)
 
 
-def avg_phash(page: fitz.Page) -> int:
-    """ページから 8x8 平均ハッシュを計算"""
-    z = 8 / max(page.rect.width, 1)
-    pix = page.get_pixmap(
-        matrix=fitz.Matrix(z, z),
-        alpha=False, colorspace=fitz.csGRAY,
-    )
-    samples = list(pix.samples)
-    if len(samples) < 64:
-        samples = samples + [0] * (64 - len(samples))
-    samples = samples[:64]
-    avg = sum(samples) / 64
-    bits = 0
-    for i, v in enumerate(samples):
-        if v >= avg:
-            bits |= 1 << i
-    return bits
-
-
-def hamming(a: int, b: int) -> int:
-    return bin(a ^ b).count("1")
-
-
 def save_pdf_pages(src_pdf: Path, from_page: int, to_page: int, out_path: Path,
                    garbage: int = 3, deflate: bool = True) -> int:
     """src_pdf の from_page〜to_page (1-based) を out_path に書き出す。
     PyMuPDF の Document.write でバイト経由にして日本語パスを安全に扱う。"""
-    with fitz.open(src_pdf) as src_doc:
+    with fitz.open(stream=src_pdf.read_bytes(), filetype="pdf") as src_doc:
         new_doc = fitz.open()
         try:
             new_doc.insert_pdf(src_doc, from_page=from_page - 1, to_page=to_page - 1)

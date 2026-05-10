@@ -140,7 +140,6 @@ def extract_kind(
 
 # ---- ファイル名サニタイズ ----
 _INVALID_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
-_KEEP_CHARS = re.compile(r'[一-龥々ぁ-んァ-ヶー〜～0-9０-９a-zA-Z\s\-_]')
 
 
 def sanitize_filename(name: str, max_length: int = 80) -> str:

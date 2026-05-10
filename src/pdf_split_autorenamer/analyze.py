@@ -11,7 +11,7 @@ import fitz
 
 from . import textops
 from .pdfio import (
-    avg_phash, extract_text_pdftotext, find_pdftotext, hamming,
+    extract_text, find_pdftotext,
     list_pdfs, render_thumb,
 )
 
@@ -54,7 +54,7 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
         if pdf_filter and not pdf_filter(pdf_path):
             continue
         try:
-            doc = fitz.open(pdf_path)
+            doc = fitz.open(stream=pdf_path.read_bytes(), filetype="pdf")
         except Exception as e:
             print(f"open failed: {pdf_path.name}: {e}")
             continue
@@ -66,8 +66,7 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                 thumb_path = thumb_dir / thumb_name
                 if not thumb_path.exists():
                     render_thumb(page, thumb_path)
-                ph = avg_phash(page)
-                text = extract_text_pdftotext(pdf_path, page_no, pdftotext_path) if pdftotext_path else page.get_text()
+                text = extract_text(pdf_path, page_no, pdftotext_path)
                 head_text = "\n".join(
                     [l for l in textops.fix_mojibake(text).splitlines() if l.strip()][:3]
                 )[:200]
@@ -78,7 +77,6 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                     "height": page.rect.height,
                     "orient": _orient(page.rect.width, page.rect.height),
                     "thumb": f"thumbs/{thumb_name}",
-                    "phash": ph,
                     "text": text,
                     "text_head": head_text,
                     "title_markers": list(TITLE_MARKER_RE.findall(
@@ -114,9 +112,8 @@ def score_boundary(prev: dict, cur: dict) -> tuple[float, list[str]]:
     if new_titles:
         score += 0.5
         reasons.append("新タイトル " + ", ".join(list(new_titles)[:2]))
-    dist = hamming(prev["phash"], cur["phash"])
     if not reasons:
-        reasons.append(f"類似 (j={j:.2f}, ph={dist})")
+        reasons.append(f"類似 (j={j:.2f})")
     return min(score, 1.0), reasons
 
 
