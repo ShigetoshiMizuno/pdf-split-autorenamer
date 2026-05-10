@@ -245,3 +245,46 @@ cp932 になることがある。`cli.py` の冒頭で `sys.stdout.reconfigure(e
 `textops.py` に `_KEEP_CHARS` 正規表現が定義されていたが、`sanitize_filename()` 内で
 参照されておらず、実装途上の残骸だった。T-04b でこの未使用定義を削除した。
 サニタイズは `_INVALID_NAME` による禁止文字除去のみで行われており、動作に変更なし。
+
+---
+
+## 7. OCR パイプライン Stage 1/2/3 実装ノート（v0.3.0）
+
+### フォールバック設計
+
+```
+Stage 1: pdftotext / PyMuPDF テキスト層抽出
+  └→ 失敗（JP比率 < 0.1 または空）のとき Stage 2 へ
+Stage 2: ページ上部 30% ROI クロップ + Tesseract OCR
+  └→ --ocr-strategy llm 指定時のみ Stage 3 へ
+Stage 3: ROI 画像 → Claude claude-3-5-sonnet 構造化抽出
+  └→ 失敗またはキーなし → Stage 2 結果にフォールバック
+```
+
+### `_try_llm_vision()` ヘルパー関数の設計意図
+
+`analyze.py` の `collect_pages()` 内でLLM呼び出しを直接書かずに `_try_llm_vision()` に
+切り出した理由: テストでは `_try_llm_vision` をモック差し替えするだけでよく、
+`ClaudeVisionBackend` 内部（API呼び出し・JWT・タイムアウト）をシミュレートしなくてよいため。
+
+### プライバシー確認フロー
+
+`--ocr-strategy llm` 実行時は画像がクラウド（Anthropic API）に送信される。
+CLI では `cmd_analyze()` が `sys.stdin.isatty()` を確認してインタラクティブ確認を行う:
+
+- TTY あり: `続行しますか？ [y/N]:` でユーザ入力を待つ
+- TTY なし（パイプ/CI 等）: 警告ログのみ出力して続行（バッチ処理のため）
+- `--yes` フラグ: 確認をスキップ（自動化スクリプト向け）
+
+### OCR キャッシュ（`.psar/ocr_cache/<hash>.txt`）
+
+`pdfio.get_ocr_cache_path(roi_bytes)` で SHA-256 ハッシュからキャッシュキーを生成。
+キャッシュヒット時は Stage 2/3 を完全スキップするため、2回目以降のコスト・時間がゼロになる。
+キャッシュは手動削除以外で失効しない設計。再抽出が必要な場合は `.psar/ocr_cache/` を削除すること。
+
+### `.gitignore` の `_*.py` パターンと `__main__.py`
+
+`.gitignore` の `_*.py` パターン（ログ・一時ファイル用）が `__main__.py` を誤って除外していた。
+`!**/__main__.py` の例外を追加して解消（PR #16 修正）。
+今後 `_` 始まりの Python ファイルを `.gitignore` に追加する際は `__init__.py` や
+`__main__.py` を誤除外しないよう注意すること。
