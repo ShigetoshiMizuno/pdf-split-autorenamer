@@ -107,7 +107,7 @@ v1.0.0:
 - [x] `tests/test_pdfio.py`: 最小サンプル PDF（自前生成）で `extract_text_pymupdf` / `save_pdf_pages` を検証
 - [x] GitHub Actions に pytest ジョブ追加（windows / ubuntu）
 - [x] 目標: コアモジュールカバレッジ 60%（T-10 で v1.0 までに 70% へ引き上げ）
-  - 現状: **全体 80%、364 テスト**（analyze/split 100%、rename 99%、server 97%、pdfio 96%、cli 95%）
+  - 現状: **全体 100%、429 テスト**（全モジュール 100% — gui.py 含む）
 
 ### T-10b: logging 移行
 - [Issue なし] [担当: PRGちゃん] [推定: 0.5日] [依存: なし]
@@ -170,9 +170,9 @@ v1.0.0:
 - [x] `test_split.py`: `normalize_groups`, `run_split`（dry-run は実PDF不要な normalize_groups のみ）
 - [x] `test_rename.py`: `choose_date`, `resolve_filenames`, `run_rename`（dry-run）
 - [x] GitHub Actions に pytest ジョブを追加（test.yml）
-- [x] カバレッジ目標: 70% → 達成（全体 77%、analyze 100%、rename 95%、split 96%、server 97%、cli 93%）
-  - 351 テスト（v1.0-ux ブランチ時点）
-  - gui.py は headless 環境で未実行のため全体を下げている（non-GUI 換算では 90%+）
+- [x] カバレッジ目標: 70% → **100% 達成**（全モジュール 100%、gui.py 含む）
+  - 429 テスト（feature/v1.0-ux ブランチ時点）
+  - gui.py: Tkinter を全モック化した test_gui_extra.py で 100% カバー
 
 ### T-11: PyPI 公開
 - [Issue なし] [担当: PRGちゃん] [推定: 0.5日]
