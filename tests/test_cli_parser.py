@@ -440,6 +440,14 @@ class TestMainModule:
                     runpy.run_module("pdf_split_autorenamer.cli", run_name="__main__")
         assert exc_info.value.code == 0
 
+    def test_package_main_guard(self):
+        """__main__.py の if __name__ == '__main__' ガードをカバー (lines 5-6)"""
+        import runpy
+        with patch("pdf_split_autorenamer.cli.main", return_value=0):
+            with pytest.raises(SystemExit) as exc_info:
+                runpy.run_module("pdf_split_autorenamer", run_name="__main__")
+        assert exc_info.value.code == 0
+
 
 class TestCmdGui:
     def test_cmd_gui_calls_gui_main(self, tmp_path):
