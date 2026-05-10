@@ -289,6 +289,32 @@ class TestCmdSplit:
             result = cmd_split(args)
         assert result == 0
 
+    def test_cmd_split_non_dry_run_prints_stats(self, tmp_path, capsys):
+        """dry_run=False のとき書き出し/スキップ件数が出力される（lines 62-63, 74）"""
+        from pdf_split_autorenamer.cli import cmd_split
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            dry_run=False,
+            force=False,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {
+            "total_input_pages": 3,
+            "files_written": 1,
+            "total_output_pages": 2,
+            "files_skipped": 1,
+            "actions": [{"status": "ok", "out": "a.pdf", "range": [1, 2]}],
+        }
+        with patch("pdf_split_autorenamer.split.run_split", return_value=mock_result):
+            result = cmd_split(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "書き出し" in captured.out
+        assert "スキップ" in captured.out
+
 
 class TestCmdRename:
     def test_cmd_rename_returns_zero(self, tmp_path):

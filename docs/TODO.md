@@ -107,6 +107,7 @@ v1.0.0:
 - [x] `tests/test_pdfio.py`: 最小サンプル PDF（自前生成）で `extract_text_pymupdf` / `save_pdf_pages` を検証
 - [x] GitHub Actions に pytest ジョブ追加（windows / ubuntu）
 - [x] 目標: コアモジュールカバレッジ 60%（T-10 で v1.0 までに 70% へ引き上げ）
+  - 現状: **全体 80%、364 テスト**（analyze/split 100%、rename 99%、server 97%、pdfio 96%、cli 95%）
 
 ### T-10b: logging 移行
 - [Issue なし] [担当: PRGちゃん] [推定: 0.5日] [依存: なし]

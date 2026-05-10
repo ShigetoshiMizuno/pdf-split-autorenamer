@@ -19,6 +19,9 @@ import fitz
 import pytest
 
 from pdf_split_autorenamer.pdfio import (
+    extract_text,
+    extract_text_pdftotext,
+    extract_text_tesseract,
     extract_text_pymupdf,
     find_tesseract,
     has_text_layer,
@@ -222,19 +225,14 @@ class TestFindTesseract:
 class TestExtractText:
     def test_returns_text_when_pdftotext_unavailable(self, tmp_path):
         """pdftotext が利用不可のとき PyMuPDF にフォールバックしてテキストを返す"""
-        from pdf_split_autorenamer.pdfio import extract_text
-        from unittest.mock import patch
         pdf_path = tmp_path / "test.pdf"
         pdf_path.write_bytes(make_simple_pdf("hello world"))
-        # pdftotext が見つからない状況をシミュレート
         with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
             result = extract_text(pdf_path, ocr_fallback=False)
         assert isinstance(result, str)
 
     def test_returns_str_from_real_pdf(self, tmp_path):
         """実際の PDF から文字列が返る"""
-        from pdf_split_autorenamer.pdfio import extract_text
-        from unittest.mock import patch
         pdf_path = tmp_path / "test.pdf"
         pdf_path.write_bytes(make_simple_pdf("2026-04-06 text"))
         with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
@@ -243,12 +241,76 @@ class TestExtractText:
 
     def test_nonexistent_pdf_returns_str(self, tmp_path):
         """存在しないファイルでも文字列を返す（例外を出さない）"""
-        from pdf_split_autorenamer.pdfio import extract_text
-        from unittest.mock import patch
         pdf_path = tmp_path / "no_such.pdf"
         with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
             result = extract_text(pdf_path, ocr_fallback=False)
         assert isinstance(result, str)
+
+    def test_ocr_fallback_on_empty_pdf(self, tmp_path):
+        """テキストなし PDF で ocr_fallback=True のとき OCR パスを通る（lines 152-161）"""
+        pdf_path = tmp_path / "empty.pdf"
+        pdf_path.write_bytes(make_image_only_pdf())
+        # Tesseract なし環境: extract_text_tesseract が "" を返す
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            with patch("pdf_split_autorenamer.pdfio.find_tesseract", return_value=None):
+                result = extract_text(pdf_path, ocr_fallback=True)
+        assert isinstance(result, str)
+
+    def test_ocr_fallback_page_no_specified(self, tmp_path):
+        """page_no 指定時の OCR フォールバックパス（line 155-156）"""
+        pdf_path = tmp_path / "empty.pdf"
+        pdf_path.write_bytes(make_image_only_pdf())
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            with patch("pdf_split_autorenamer.pdfio.find_tesseract", return_value=None):
+                result = extract_text(pdf_path, page_no=1, ocr_fallback=True)
+        assert isinstance(result, str)
+
+    def test_ocr_fallback_returns_ocr_text_when_tesseract_succeeds(self, tmp_path):
+        """Tesseract が非空テキストを返したとき ocr_text を返す（line 162）"""
+        pdf_path = tmp_path / "empty.pdf"
+        pdf_path.write_bytes(make_image_only_pdf())
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            with patch("pdf_split_autorenamer.pdfio.extract_text_tesseract",
+                       return_value="OCR テキスト"):
+                result = extract_text(pdf_path, ocr_fallback=True)
+        assert result == "OCR テキスト"
+
+    def test_ocr_fallback_exception_handled(self, tmp_path):
+        """OCR フォールバック中に例外が発生しても '' を返す（lines 163-164）"""
+        pdf_path = tmp_path / "empty.pdf"
+        pdf_path.write_bytes(make_image_only_pdf())
+        with patch("pdf_split_autorenamer.pdfio.find_pdftotext", return_value=None):
+            with patch("pdf_split_autorenamer.pdfio.extract_text_pymupdf", return_value=""):
+                with patch("fitz.open", side_effect=RuntimeError("open failed")):
+                    result = extract_text(pdf_path, ocr_fallback=True)
+        assert isinstance(result, str)
+
+
+class TestExtractTextPdftotext:
+    def test_returns_empty_when_copy_fails(self, tmp_path):
+        """pdf_path が存在しない場合 shutil.copy2 が失敗して '' を返す（lines 120-121）"""
+        pdf_path = tmp_path / "nonexistent.pdf"
+        result = extract_text_pdftotext(pdf_path, pdftotext="fake_pdftotext_exe")
+        assert result == ""
+
+
+class TestExtractTextTesseract:
+    def test_tessdata_warning_returns_empty(self):
+        """stderr に tessdata が含まれる場合 logging.warning を出して '' を返す（lines 73-74）"""
+        mock_result = MagicMock()
+        mock_result.stdout = b""
+        mock_result.stderr = b"Error, could not initialize tessdata"
+        with patch("pdf_split_autorenamer.pdfio.find_tesseract", return_value="/fake/tesseract"):
+            with patch("subprocess.run", return_value=mock_result):
+                result = extract_text_tesseract(b"fake image bytes")
+        assert result == ""
+
+    def test_subprocess_exception_returns_empty(self):
+        """subprocess.run が例外を投げた場合 '' を返す（lines 74-75）"""
+        with patch("pdf_split_autorenamer.pdfio.find_tesseract", return_value="/fake/tesseract"):
+            with patch("subprocess.run", side_effect=RuntimeError("crash")):
+                result = extract_text_tesseract(b"fake image bytes")
+        assert result == ""
 
 
 # ---------------------------------------------------------------------------

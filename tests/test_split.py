@@ -262,3 +262,18 @@ class TestRunSplit:
         statuses = [a["status"] for a in result["actions"]]
         assert "skip-exists" in statuses
         assert result["files_skipped"] == 1
+
+    def test_split_error_when_save_fails(self, tmp_path):
+        """save_pdf_pages が例外を投げたとき status に 'error:' が含まれる（lines 103-105）"""
+        from unittest.mock import patch
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 1], "name": ""}]},
+        )
+        with patch("pdf_split_autorenamer.split.save_pdf_pages",
+                   side_effect=RuntimeError("disk full")):
+            result = run_split(tmp_path)
+        statuses = [a["status"] for a in result["actions"]]
+        assert any("error" in s for s in statuses)

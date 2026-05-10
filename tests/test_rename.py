@@ -330,6 +330,15 @@ class TestFindTargets:
         result = find_targets(tmp_path, mode="split")
         assert result == []
 
+    def test_all_mode_excludes_dated_non_unknown_files(self, tmp_path):
+        """all モードでも YYYY-MM-DD_*.pdf（非日付不明）は除外される（line 90 pass→continue）"""
+        (tmp_path / "scan_01.pdf").write_bytes(b"")
+        (tmp_path / "2026-04-06_週報.pdf").write_bytes(b"")  # DATED_PAT match, not UNKNOWN_PAT
+        result = find_targets(tmp_path, mode="all")
+        names = [p.name for p in result]
+        assert "scan_01.pdf" in names
+        assert "2026-04-06_週報.pdf" not in names
+
 
 # ---------------------------------------------------------------------------
 # make_plan
@@ -376,6 +385,15 @@ class TestMakePlan:
         result = make_plan([], ocr_fallback=False)
         assert result == []
 
+    def test_make_plan_kind_from_filename_when_text_generic(self, tmp_path):
+        """テキストから kind が決まらないとき、ファイル名のヒントで kind を補完する（line 123）"""
+        # scan_01_週報.pdf という名前にする → existing_name_part → "週報" → extract_kind → "週報"
+        p = self._make_pdf(tmp_path, "scan_01_週報.pdf", "2026-04-06")
+        result = make_plan([p], ocr_fallback=False)
+        # テキスト "2026-04-06" は kind を "書類" にする（パターン不一致）
+        # ファイル名ヒント "週報" から kind が "週報" に補完される
+        assert result[0]["kind"] == "週報"
+
 
 # ---------------------------------------------------------------------------
 # fallback_title（名前部分ありケース）
@@ -416,6 +434,22 @@ class TestRunRename:
         p = tmp_path / name
         p.write_bytes(data)
         return p
+
+    def test_noop_when_file_already_correctly_named(self, tmp_path):
+        """リネーム先が同一ファイルのとき status='noop' を返す（line 197）"""
+        self._make_pdf(tmp_path, "日付不明_書類.pdf", "no date here generic text")
+        result = run_rename(tmp_path, mode="unknown", apply=True, ocr_fallback=False)
+        statuses = [a["status"] for a in result["actions"]]
+        assert "noop" in statuses
+
+    def test_rename_error_logged_as_error_status(self, tmp_path):
+        """src.rename() が失敗したとき status に 'error:' が含まれる（lines 203-205）"""
+        from unittest.mock import patch
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        with patch("pathlib.Path.rename", side_effect=PermissionError("access denied")):
+            result = run_rename(tmp_path, mode="split", apply=True, ocr_fallback=False)
+        statuses = [a["status"] for a in result["actions"]]
+        assert any("error" in s for s in statuses)
 
     def test_no_targets_returns_empty_actions(self, tmp_path):
         """対象ファイルがない場合は空のアクションリストを返す"""
