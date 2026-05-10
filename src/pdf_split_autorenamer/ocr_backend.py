@@ -5,6 +5,17 @@ from __future__ import annotations
 import logging
 import subprocess
 from abc import ABC, abstractmethod
+from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib  # type: ignore[no-reattr-module]
+    except ImportError:
+        tomllib = None  # type: ignore[assignment]
+
+_VALID_STRATEGIES = frozenset({"fast", "balanced", "roi", "thorough", "llm"})
 
 
 class OcrBackend(ABC):
@@ -107,3 +118,41 @@ class GoogleVisionBackend(OcrBackend):
         raise NotImplementedError(
             "GoogleVisionBackend は未実装です。T-07 で実装予定。"
         )
+
+
+class OcrStrategy:
+    """OCR 戦略設定。Stage 1〜llm を順次試す方針を保持する。
+
+    strategy:
+        "fast"     — Stage 1 のみ（pdftotext / PyMuPDF）
+        "balanced" — Stage 1 + テキスト空なら Tesseract
+        "roi"      — Stage 1 + 品質低時に上部 ROI クロップ + Tesseract
+        "thorough" — roi + 全ページ Tesseract（将来実装）
+        "llm"      — roi + LLM Vision（T-07 で実装）
+    """
+
+    def __init__(self, strategy: str = "balanced", roi_ratio: float = 0.3) -> None:
+        if strategy not in _VALID_STRATEGIES:
+            raise ValueError(
+                f"不正な OCR 戦略: {strategy!r}。有効値: {sorted(_VALID_STRATEGIES)}"
+            )
+        self.strategy = strategy
+        self.roi_ratio = roi_ratio
+
+
+def load_psar_config(project_dir: Path) -> dict:
+    """project_dir/.psar/config.toml を読み込んで dict で返す。
+    ファイルが存在しないか空の場合は空 dict を返す。"""
+    config_path = project_dir / ".psar" / "config.toml"
+    if not config_path.exists():
+        return {}
+    if tomllib is None:
+        logging.warning("tomllib が利用できないため config.toml を読み込めません")
+        return {}
+    try:
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+        return data
+    except Exception as e:
+        logging.warning("config.toml の読み込みに失敗しました: %s", e)
+        return {}

@@ -111,22 +111,22 @@ class TestCliOcrStrategyChoices:
     def test_cli_accepts_thorough(self):
         """CLI が --ocr-strategy thorough を受け付ける"""
         import argparse
-        from pdf_split_autorenamer.cli import _build_parser
-        parser = _build_parser()
+        from pdf_split_autorenamer.cli import build_parser
+        parser = build_parser()
         args = parser.parse_args(["analyze", ".", "--ocr-strategy", "thorough"])
         assert args.ocr_strategy == "thorough"
 
     def test_cli_accepts_llm(self):
         """CLI が --ocr-strategy llm を受け付ける"""
-        from pdf_split_autorenamer.cli import _build_parser
-        parser = _build_parser()
+        from pdf_split_autorenamer.cli import build_parser
+        parser = build_parser()
         args = parser.parse_args(["analyze", ".", "--ocr-strategy", "llm"])
         assert args.ocr_strategy == "llm"
 
     def test_cli_rejects_invalid(self):
         """CLI が不正な --ocr-strategy を拒否する"""
         import sys
-        from pdf_split_autorenamer.cli import _build_parser
-        parser = _build_parser()
+        from pdf_split_autorenamer.cli import build_parser
+        parser = build_parser()
         with pytest.raises(SystemExit):
             parser.parse_args(["analyze", ".", "--ocr-strategy", "invalid"])
