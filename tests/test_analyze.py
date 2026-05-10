@@ -164,17 +164,20 @@ class TestScoreBoundary:
         assert any("サイズ" in r for r in reasons), f"サイズ変化が reasons に含まれない: {reasons}"
         assert score >= 0.4
 
-    def test_medium_bigram_similarity_raises_score_moderately(self):
-        """Jaccard 類似度が 0.05〜0.10 の範囲でスコアが適度に上がる"""
-        # bigram が 20 個あってそのうち 1〜2 個が共通 → Jaccard ≈ 0.05〜0.10
-        shared = {"ab"}
-        prev_bigrams = shared | {f"p{i}" for i in range(19)}
-        cur_bigrams = shared | {f"q{i}" for i in range(19)}
+    def test_medium_bigram_similarity_adds_02(self):
+        """Jaccard 類似度が 0.05〜0.10 の範囲でスコアに +0.2 が加算される"""
+        # prev: {s1,s2} ∪ {p0..p17} = 20 要素
+        # cur: {s1,s2} ∪ {q0..q17} = 20 要素
+        # intersection=2, union=38 → Jaccard=2/38≈0.053（0.05〜0.10の範囲）
+        shared = {"s1", "s2"}
+        prev_bigrams = shared | {f"p{i}" for i in range(18)}
+        cur_bigrams = shared | {f"q{i}" for i in range(18)}
         prev = _make_page(bigram=prev_bigrams, orient="P")
         cur = _make_page(page=2, bigram=cur_bigrams, orient="P")
         score, reasons = score_boundary(prev, cur)
-        # 何らかの類似度関連の reasons があればよい
-        assert score >= 0.0  # スコアが 0 以上であること
+        # Jaccard≈0.053 → 0.05〜0.10の範囲 → +0.2 加算。reasons に類似度低の文字列が含まれる
+        assert any("類似低" in r for r in reasons), f"テキスト類似低が reasons にない: {reasons}"
+        assert 0.1 <= score <= 0.5
 
     def test_empty_bigram_one_side_scores_high(self):
         """一方のページの bigram が空（テキストなし）の場合 Jaccard=0 でスコアが上がる"""
@@ -182,6 +185,25 @@ class TestScoreBoundary:
         cur = _make_page(page=2, bigram={"ab", "bc", "cd"}, orient="P")
         score, _ = score_boundary(prev, cur)
         assert score >= 0.4
+
+
+class TestBigramInternal:
+    def test_short_text_returns_empty_set(self):
+        """1文字以下のテキストは空の bigram を返す（_bigram の内部動作確認）"""
+        from pdf_split_autorenamer.analyze import _bigram
+        assert _bigram("a") == set()
+        assert _bigram("") == set()
+        assert _bigram("  ") == set()  # 空白のみも空
+
+    def test_two_chars_returns_one_bigram(self):
+        """2文字テキストは 1 個の bigram を返す"""
+        from pdf_split_autorenamer.analyze import _bigram
+        assert _bigram("ab") == {"ab"}
+
+    def test_whitespace_stripped_before_bigram(self):
+        """空白を除去してから bigram を生成する"""
+        from pdf_split_autorenamer.analyze import _bigram
+        assert _bigram("a b") == {"ab"}  # 'ab' の空白除去後
 
 
 # ---------------------------------------------------------------------------
