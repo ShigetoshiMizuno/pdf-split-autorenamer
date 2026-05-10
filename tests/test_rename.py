@@ -339,6 +339,15 @@ class TestFindTargets:
         assert "scan_01.pdf" in names
         assert "2026-04-06_週報.pdf" not in names
 
+    def test_non_file_pdf_glob_result_skipped(self, tmp_path):
+        """glob が返す *.pdf がファイルでない（ディレクトリ）場合はスキップ (line 83)"""
+        # *.pdf という名前のディレクトリを作成する
+        pdf_dir = tmp_path / "scan_01.pdf"
+        pdf_dir.mkdir()
+        result = find_targets(tmp_path, mode="split")
+        # ディレクトリは含まれない
+        assert len(result) == 0
+
 
 # ---------------------------------------------------------------------------
 # make_plan

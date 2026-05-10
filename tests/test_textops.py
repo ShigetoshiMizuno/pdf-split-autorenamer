@@ -167,6 +167,18 @@ class TestExtractDatesAll:
         """日付がない文字列は空リストを返す"""
         assert extract_dates_all("主日礼拝メッセージ") == []
 
+    def test_duplicate_pattern_deduplicates_same_position(self):
+        """同一位置に複数パターンが一致する場合、seen_positions により1件のみ返る (line 94)"""
+        import re
+        import pdf_split_autorenamer.textops as textops_module
+        dup_patterns = [
+            re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})"),
+            re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})"),
+        ]
+        with patch.object(textops_module, "_DATE_PATTERNS", dup_patterns):
+            result = extract_dates_all("2026-04-06")
+        assert result == ["2026-04-06"]
+
 
 # ---------------------------------------------------------------------------
 # extract_kind
@@ -348,6 +360,21 @@ class TestLoadProfileIntegration:
         assert len(body_patterns) == 1
         assert title_patterns[0][1] == "TestDoc"
         assert body_patterns[0][1] == "BodyKind"
+
+
+class TestTomllibImportChain:
+    def test_tomllib_fallback_chain_when_builtin_missing(self):
+        """tomllib も tomli も利用不可な環境では textops.tomllib が None になる (lines 10-14)"""
+        import importlib
+        import sys
+        import pdf_split_autorenamer.textops as textops_mod
+
+        with patch.dict(sys.modules, {"tomllib": None, "tomli": None}):
+            importlib.reload(textops_mod)
+            assert textops_mod.tomllib is None
+
+        # テスト後に正常状態へ戻す
+        importlib.reload(textops_mod)
 
 
 class TestLoadMojibakeMapIntegration:

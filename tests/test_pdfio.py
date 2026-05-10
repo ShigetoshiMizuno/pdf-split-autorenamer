@@ -217,6 +217,23 @@ class TestFindTesseract:
         result = find_tesseract()
         assert result is None or isinstance(result, str)
 
+    def test_hardcoded_path_found_when_which_returns_none(self, monkeypatch):
+        """shutil.which が None で TESSERACT 未設定のとき、ハードコードパスが返ること"""
+        monkeypatch.delenv("TESSERACT", raising=False)
+        with patch("shutil.which", return_value=None):
+            with patch("pathlib.Path.is_file", return_value=True):
+                result = find_tesseract()
+        assert isinstance(result, str)
+
+    def test_hardcoded_pdftotext_path_found(self, monkeypatch):
+        """find_pdftotext: shutil.which が None のとき、ハードコードパスが返ること"""
+        from pdf_split_autorenamer.pdfio import find_pdftotext
+        monkeypatch.delenv("PDFTOTEXT", raising=False)
+        with patch("shutil.which", return_value=None):
+            with patch("pathlib.Path.is_file", return_value=True):
+                result = find_pdftotext()
+        assert isinstance(result, str)
+
 
 # ---------------------------------------------------------------------------
 # extract_text (メイン関数)

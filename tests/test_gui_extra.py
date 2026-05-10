@@ -1,0 +1,532 @@
+# -*- coding: utf-8 -*-
+"""gui.py の追加カバレッジテスト（Tkinter を最大限モック）
+
+対象:
+- _TextHandler._append (lines 37-38)
+- App._build_ui (lines 56-128)
+- App._on_browse (lines 133-136)
+- App._get_folder (lines 147-155)
+- App._log / _set_status (lines 158-164)
+- App._run_async (lines 167-176)
+- App._build_split_summary / _build_rename_summary (static, lines 181-214)
+- App._on_analyze early return (lines 221-242)
+- App._on_open_report (lines 245-252)
+- App._on_split early return (lines 255-257)
+- App._on_rename early return (line 313) + done closures (329-330, 349-363)
+- main (lines 369-371)
+- __main__ guard (line 375)
+"""
+from __future__ import annotations
+
+import threading
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+# ---------------------------------------------------------------------------
+# スタブ (test_gui_profile.py と共通)
+# ---------------------------------------------------------------------------
+
+class _StringVar:
+    def __init__(self, value: str = ""):
+        self._v = value
+    def get(self) -> str:
+        return self._v
+    def set(self, v: str) -> None:
+        self._v = v
+
+
+class _BooleanVar:
+    def __init__(self, value: bool = False):
+        self._v = value
+    def get(self) -> bool:
+        return self._v
+    def set(self, v: bool) -> None:
+        self._v = v
+
+
+def _make_app(folder: str = "") -> object:
+    from pdf_split_autorenamer import gui as gui_module
+    with patch.object(gui_module.App, "__init__", return_value=None):
+        app = gui_module.App()
+    app.__dict__.update({
+        "folder_var": _StringVar(folder),
+        "rename_mode_var": _StringVar("split"),
+        "force_var": _BooleanVar(False),
+        "profile_var": _StringVar(""),
+        "status_var": _StringVar("待機中"),
+        "log": MagicMock(),
+    })
+    return app
+
+
+# ---------------------------------------------------------------------------
+# _TextHandler._append  (lines 37-38)
+# ---------------------------------------------------------------------------
+
+class TestTextHandlerAppend:
+    def test_append_inserts_and_scrolls(self):
+        """_append が insert → see を呼ぶこと"""
+        from pdf_split_autorenamer.gui import _TextHandler
+        mock_widget = MagicMock()
+        handler = _TextHandler(mock_widget)
+        handler._append("hello world")
+        mock_widget.insert.assert_called_once_with("end", "hello world\n")
+        mock_widget.see.assert_called_once_with("end")
+
+
+# ---------------------------------------------------------------------------
+# _build_ui  (lines 56-128)
+# ---------------------------------------------------------------------------
+
+class TestBuildUi:
+    def test_build_ui_runs_without_error(self):
+        """ttk / tk をモックして _build_ui がクラッシュしないこと (lines 56-128)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        with patch.object(gui_module, "ttk", MagicMock()), \
+             patch.object(gui_module, "tk", MagicMock()), \
+             patch("logging.getLogger", return_value=MagicMock()):
+            app._build_ui()
+
+
+# ---------------------------------------------------------------------------
+# _on_browse  (lines 133-136)
+# ---------------------------------------------------------------------------
+
+class TestOnBrowse:
+    def test_browse_sets_folder_var(self):
+        """フォルダを選択すると folder_var に設定される"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        with patch.object(gui_module.filedialog, "askdirectory", return_value="/some/folder"):
+            app._on_browse()
+        assert app.folder_var.get() == "/some/folder"
+
+    def test_browse_cancel_keeps_existing(self):
+        """キャンセル（空文字）のとき folder_var は変更されない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("/original")
+        with patch.object(gui_module.filedialog, "askdirectory", return_value=""):
+            app._on_browse()
+        assert app.folder_var.get() == "/original"
+
+
+# ---------------------------------------------------------------------------
+# _get_folder  (lines 147-155)
+# ---------------------------------------------------------------------------
+
+class TestGetFolder:
+    def test_empty_folder_shows_warning_returns_none(self):
+        """folder_var が空なら警告ダイアログを出して None を返す"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("")
+        with patch.object(gui_module.messagebox, "showwarning") as mw:
+            result = app._get_folder()
+        assert result is None
+        mw.assert_called_once()
+
+    def test_nonexistent_folder_shows_error_returns_none(self):
+        """存在しないパスならエラーダイアログを出して None を返す"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("/nonexistent/xyz/abc")
+        with patch.object(gui_module.messagebox, "showerror") as me:
+            result = app._get_folder()
+        assert result is None
+        me.assert_called_once()
+
+    def test_valid_folder_returns_path(self, tmp_path):
+        """存在するフォルダなら Path を返す"""
+        from pdf_split_autorenamer.gui import App
+        app = _make_app(str(tmp_path))
+        result = app._get_folder()
+        assert result == tmp_path
+
+
+# ---------------------------------------------------------------------------
+# _log / _set_status  (lines 158-164)
+# ---------------------------------------------------------------------------
+
+class TestLogAndStatus:
+    def test_log_inserts_text(self):
+        """_log が insert / see を呼ぶこと"""
+        app = _make_app()
+        with patch.object(app, "update_idletasks"):
+            app._log("テストメッセージ")
+        app.log.insert.assert_called_once_with("end", "テストメッセージ\n")
+        app.log.see.assert_called_once_with("end")
+
+    def test_set_status_updates_var(self):
+        """_set_status が status_var を更新すること"""
+        app = _make_app()
+        with patch.object(app, "update_idletasks"):
+            app._set_status("処理中")
+        assert app.status_var.get() == "処理中"
+
+
+# ---------------------------------------------------------------------------
+# _run_async  (lines 167-176)
+# ---------------------------------------------------------------------------
+
+class TestRunAsync:
+    def test_run_async_calls_on_done_with_result(self):
+        """ワーカースレッドが完了すると on_done がコールバックされる"""
+        app = _make_app()
+        done_values = []
+        event = threading.Event()
+
+        def on_done(r):
+            done_values.append(r)
+            event.set()
+
+        with patch.object(app, "after", side_effect=lambda delay, fn, *a: fn(*a)):
+            app._run_async(lambda: 42, on_done)
+
+        event.wait(timeout=3)
+        assert done_values == [42]
+
+    def test_run_async_exception_logs_error(self):
+        """ワーカーが例外を出すと _log("ERROR: ...") が呼ばれる"""
+        app = _make_app()
+        logged = []
+        event = threading.Event()
+
+        def after_impl(delay, fn, *args):
+            result = fn(*args)
+            event.set()
+            return result
+
+        with patch.object(app, "after", side_effect=after_impl), \
+             patch.object(app, "_log", side_effect=logged.append), \
+             patch.object(app, "_set_status"):
+            app._run_async(lambda: (_ for _ in ()).throw(ValueError("boom")))
+
+        event.wait(timeout=3)
+        assert any("ERROR" in m for m in logged)
+
+    def test_run_async_no_callback_runs_target(self):
+        """on_done が None でもターゲットは実行される"""
+        app = _make_app()
+        called = threading.Event()
+        with patch.object(app, "after"):
+            app._run_async(lambda: called.set())
+        called.wait(timeout=3)
+        assert called.is_set()
+
+
+# ---------------------------------------------------------------------------
+# Static summaries  (lines 181-214)
+# ---------------------------------------------------------------------------
+
+class TestBuildSplitSummary:
+    def test_basic_output(self):
+        from pdf_split_autorenamer.gui import App
+        res = {"actions": [{"status": "ok", "out": "file.pdf", "range": "1-3"}],
+               "files_written": 1, "total_output_pages": 3}
+        s = App._build_split_summary(res)
+        assert "1 ファイル" in s
+        assert "3 ページ" in s
+        assert "file.pdf" in s
+
+    def test_long_list_truncated(self):
+        from pdf_split_autorenamer.gui import App
+        actions = [{"status": "ok", "out": f"f{i}.pdf", "range": f"{i}"} for i in range(15)]
+        res = {"actions": actions, "files_written": 15, "total_output_pages": 15}
+        s = App._build_split_summary(res)
+        assert "他 5 件" in s
+
+    def test_empty_actions(self):
+        from pdf_split_autorenamer.gui import App
+        res = {"actions": [], "files_written": 0, "total_output_pages": 0}
+        s = App._build_split_summary(res)
+        assert "実行してよろしいですか" in s
+
+
+class TestBuildRenameSummary:
+    def test_basic_output(self):
+        from pdf_split_autorenamer.gui import App
+        res = {
+            "targets": 2,
+            "actions": [{"status": "dry-run", "src": "old.pdf", "src_display": "old.pdf",
+                          "dst": "2026-04-06_週報.pdf", "date": "2026-04-06", "kind": "週報"}],
+        }
+        s = App._build_rename_summary(res, "split")
+        assert "2 件" in s
+        assert "old.pdf" in s
+
+    def test_skip_status(self):
+        from pdf_split_autorenamer.gui import App
+        res = {
+            "targets": 1,
+            "actions": [{"status": "skip", "src": "old.pdf", "src_display": "old.pdf",
+                          "dst": "new.pdf", "date": "2026-04-06", "kind": "週報"}],
+        }
+        s = App._build_rename_summary(res, "split")
+        assert "skip" in s
+        assert "既存ファイルあり" in s
+
+    def test_truncates_long_list(self):
+        from pdf_split_autorenamer.gui import App
+        actions = [{"status": "dry-run", "src": f"f{i}.pdf", "src_display": f"f{i}.pdf",
+                    "dst": f"d{i}.pdf", "date": None, "kind": "書類"} for i in range(15)]
+        res = {"targets": 15, "actions": actions}
+        s = App._build_rename_summary(res, "split")
+        assert "他 5 件" in s
+
+
+# ---------------------------------------------------------------------------
+# _on_analyze early return  (line 222-223)
+# ---------------------------------------------------------------------------
+
+class TestOnAnalyze:
+    def test_early_return_when_no_folder(self):
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("")
+        with patch.object(app, "_get_folder", return_value=None), \
+             patch.object(app, "_run_async") as mra:
+            app._on_analyze()
+        mra.assert_not_called()
+
+    def test_calls_run_analyze(self, tmp_path):
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        mock_result = {"pages": 2, "groups": 1, "report_html": None, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+
+    def test_analyze_done_with_html_opens_browser(self, tmp_path):
+        """report_html が返ると done コールバックがブラウザ開示ダイアログを出す (lines 235-239)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        fake_html = str(tmp_path / "report.html")
+        mock_result = {"pages": 3, "groups": 2, "report_html": fake_html, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
+             patch.object(gui_module, "webbrowser") as mwb, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        mwb.open.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# _on_open_report  (lines 245-252)
+# ---------------------------------------------------------------------------
+
+class TestOnOpenReport:
+    def test_early_return_when_no_folder(self):
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        with patch.object(app, "_get_folder", return_value=None), \
+             patch.object(gui_module, "webbrowser") as mwb:
+            app._on_open_report()
+        mwb.open.assert_not_called()
+
+    def test_warning_when_report_missing(self, tmp_path):
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(gui_module.messagebox, "showwarning") as mw:
+            app._on_open_report()
+        mw.assert_called_once()
+
+    def test_opens_browser_when_report_exists(self, tmp_path):
+        from pdf_split_autorenamer import gui as gui_module
+        psar = tmp_path / ".psar"
+        psar.mkdir()
+        (psar / "report.html").write_text("<html/>", encoding="utf-8")
+        app = _make_app(str(tmp_path))
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(gui_module, "webbrowser") as mwb:
+            app._on_open_report()
+        mwb.open.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# _on_split early return  (lines 255-257)
+# ---------------------------------------------------------------------------
+
+class TestOnSplit:
+    def test_early_return_when_no_folder(self):
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        with patch.object(app, "_get_folder", return_value=None), \
+             patch.object(app, "_run_async") as mra:
+            app._on_split(False)
+        mra.assert_not_called()
+
+    def test_dry_run_logs_actions(self, tmp_path):
+        """_on_split(False): done_dry コールバックがアクションをログに出力 (lines 258-275)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        logged = []
+        mock_result = {
+            "actions": [{"status": "ok", "out": "out.pdf", "src": "src.pdf", "range": "1-3"}],
+            "total_input_pages": 5,
+            "files_written": 1,
+            "total_output_pages": 3,
+            "files_skipped": 0,
+        }
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(gui_module._split, "run_split", return_value=mock_result), \
+             patch.object(app, "_log", side_effect=logged.append), \
+             patch.object(app, "_set_status"), \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_split(apply_=False)
+        assert any("out.pdf" in m for m in logged)
+
+    def test_apply_with_confirm_logs_results(self, tmp_path):
+        """_on_split(True): done_preview → messagebox.askyesno=True → done_apply (lines 278-308)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        logged = []
+        mock_result = {
+            "actions": [{"status": "ok", "out": "out.pdf", "src": "src.pdf", "range": "1-3"}],
+            "total_input_pages": 5,
+            "files_written": 1,
+            "total_output_pages": 3,
+            "files_skipped": 0,
+        }
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(gui_module._split, "run_split", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
+             patch.object(app, "_log", side_effect=logged.append), \
+             patch.object(app, "_set_status"), \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_split(apply_=True)
+        assert any("分割完了" in m or "out.pdf" in m for m in logged)
+
+    def test_apply_cancel_sets_cancel_status(self, tmp_path):
+        """_on_split(True): messagebox.askyesno=False → キャンセル (line 288-289)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        statuses = []
+        mock_result = {
+            "actions": [],
+            "total_input_pages": 0,
+            "files_written": 0,
+            "total_output_pages": 0,
+            "files_skipped": 0,
+        }
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(gui_module._split, "run_split", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "askyesno", return_value=False), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status", side_effect=statuses.append), \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_split(apply_=True)
+        assert "キャンセル" in statuses
+
+
+# ---------------------------------------------------------------------------
+# _on_rename early return (line 313) + done closures (lines 329-330, 349-363)
+# ---------------------------------------------------------------------------
+
+class TestOnRenameExtra:
+    def test_early_return_when_no_folder(self):
+        """folder が None なら即 return (line 313)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        with patch.object(app, "_get_folder", return_value=None), \
+             patch.object(app, "_run_async") as mra:
+            app._on_rename(apply_=False)
+        mra.assert_not_called()
+
+    def test_done_dry_logs_actions(self, tmp_path):
+        """done_dry コールバックがアクションをログに出力する (lines 327-331)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        logged = []
+        mock_result = {
+            "targets": 1,
+            "actions": [{"status": "dry-run", "src": "scan_01.pdf",
+                          "src_display": "scan_01.pdf",
+                          "dst": "2026-04-06_書類.pdf", "date": "2026-04-06", "kind": "書類"}],
+            "applied": 0,
+        }
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(gui_module._rename, "run_rename", return_value=mock_result), \
+             patch.object(app, "_log", side_effect=logged.append), \
+             patch.object(app, "_set_status"), \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_rename(apply_=False)
+        assert any("scan_01.pdf" in m for m in logged)
+
+    def test_done_apply_logs_results(self, tmp_path):
+        """done_apply コールバックが完了件数をログに出力する (lines 349-363)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        logged = []
+        mock_result = {
+            "targets": 1,
+            "actions": [{"status": "ok", "src": "scan_01.pdf", "src_display": "scan_01.pdf",
+                          "dst": "2026-04-06_書類.pdf", "date": "2026-04-06", "kind": "書類"}],
+            "applied": 1,
+        }
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(gui_module._rename, "run_rename", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
+             patch.object(app, "_log", side_effect=logged.append), \
+             patch.object(app, "_set_status"), \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_rename(apply_=True)
+        assert any("1 件" in m for m in logged)
+
+
+# ---------------------------------------------------------------------------
+# main (lines 369-371) + __main__ guard (line 375)
+# ---------------------------------------------------------------------------
+
+class TestMain:
+    def test_main_creates_app_and_mainloops(self):
+        """main() が App を生成して mainloop() を呼ぶこと"""
+        from pdf_split_autorenamer import gui as gui_module
+        mock_app = MagicMock()
+        with patch.object(gui_module, "App", return_value=mock_app) as mock_cls:
+            result = gui_module.main(initial_folder="/tmp")
+        mock_cls.assert_called_once_with(initial_folder="/tmp")
+        mock_app.mainloop.assert_called_once()
+        assert result == 0
+
+    def test_gui_if_main_guard(self):
+        """gui.py の if __name__ == '__main__' をカバー (line 375)
+
+        runpy は fresh namespace を使うため tkinter.Tk を直接パッチする。
+        """
+        import runpy
+        import sys as _sys
+        import tkinter
+        import tkinter.ttk as _ttk
+
+        mock_tk = MagicMock()
+        with patch.object(tkinter, "Tk", return_value=mock_tk), \
+             patch.object(_ttk, "Frame", return_value=MagicMock()), \
+             patch.object(_ttk, "Label", return_value=MagicMock()), \
+             patch.object(_ttk, "Button", return_value=MagicMock()), \
+             patch.object(_ttk, "Entry", return_value=MagicMock()), \
+             patch.object(_ttk, "Scrollbar", return_value=MagicMock()), \
+             patch.object(_ttk, "LabelFrame", return_value=MagicMock()), \
+             patch.object(_ttk, "Radiobutton", return_value=MagicMock()), \
+             patch.object(_ttk, "Checkbutton", return_value=MagicMock()), \
+             patch.object(tkinter, "Text", return_value=MagicMock()), \
+             patch.object(tkinter, "StringVar", return_value=MagicMock()), \
+             patch.object(tkinter, "BooleanVar", return_value=MagicMock()):
+            mock_tk.mainloop.return_value = None
+            with patch.object(_sys, "exit", side_effect=SystemExit(0)):
+                with pytest.raises(SystemExit):
+                    runpy.run_module("pdf_split_autorenamer.gui", run_name="__main__")

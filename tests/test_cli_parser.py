@@ -411,6 +411,24 @@ class TestGetVersion:
         assert result == "0.2.0"
 
 
+class TestStdoutReconfigure:
+    def test_reconfigure_exception_is_swallowed(self):
+        """stdout.reconfigure が例外を出しても握り潰される (cli.py lines 13-14)"""
+        import importlib
+        import sys
+        import pdf_split_autorenamer.cli as cli_mod
+
+        def raise_attr(encoding):
+            raise AttributeError("reconfigure not supported in this environment")
+
+        original = sys.stdout.reconfigure
+        sys.stdout.reconfigure = raise_attr
+        try:
+            importlib.reload(cli_mod)
+        finally:
+            sys.stdout.reconfigure = original
+
+
 class TestMainModule:
     def test_main_module_as_script(self, tmp_path):
         """python -m pdf_split_autorenamer のエントリポイントが動作する（__main__.py lines 3-6）"""
@@ -421,6 +439,27 @@ class TestMainModule:
                 with pytest.raises(SystemExit) as exc_info:
                     runpy.run_module("pdf_split_autorenamer", run_name="__main__")
         assert exc_info.value.code == 0
+
+    def test_cli_py_if_main_guard(self, tmp_path):
+        """cli.py の if __name__ == '__main__' ガードをカバー (line 200)"""
+        import runpy
+        mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
+        with patch("sys.argv", ["psar", "analyze", str(tmp_path)]):
+            with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
+                with pytest.raises(SystemExit) as exc_info:
+                    runpy.run_module("pdf_split_autorenamer.cli", run_name="__main__")
+        assert exc_info.value.code == 0
+
+
+class TestCmdGui:
+    def test_cmd_gui_calls_gui_main(self, tmp_path):
+        """cmd_gui は gui.main を呼び出す (lines 125-126)"""
+        import argparse
+        from pdf_split_autorenamer.cli import cmd_gui
+        args = argparse.Namespace(folder=str(tmp_path))
+        with patch("pdf_split_autorenamer.gui.main", return_value=0):
+            result = cmd_gui(args)
+        assert result == 0
 
 
 # ---------------------------------------------------------------------------
