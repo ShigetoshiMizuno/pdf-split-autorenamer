@@ -431,13 +431,18 @@ class TestStdoutReconfigure:
 
 class TestMainModule:
     def test_main_module_as_script(self, tmp_path):
-        """python -m pdf_split_autorenamer のエントリポイントが動作する（__main__.py lines 3-6）"""
+        """python -m pdf_split_autorenamer のエントリポイントが動作する（__main__.py lines 3-6）
+
+        runpy.run_module("pdf_split_autorenamer") はパッケージ実行のため
+        Python バージョン・環境によっては __main__ の解決に失敗する場合がある。
+        そのため __main__.py を直接モジュールとして実行する形に変更。
+        """
         import runpy
         mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
         with patch("sys.argv", ["psar", "analyze", str(tmp_path)]):
             with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
                 with pytest.raises(SystemExit) as exc_info:
-                    runpy.run_module("pdf_split_autorenamer", run_name="__main__")
+                    runpy.run_module("pdf_split_autorenamer.__main__", run_name="__main__")
         assert exc_info.value.code == 0
 
     def test_cli_py_if_main_guard(self, tmp_path):
