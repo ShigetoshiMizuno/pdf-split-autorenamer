@@ -8,12 +8,10 @@ import fitz
 import pytest
 
 from pdf_split_autorenamer.pdfio import (
-    avg_phash,
     extract_text,
     extract_text_pdftotext,
     extract_text_pymupdf,
     find_pdftotext,
-    hamming,
     list_pdfs,
     render_thumb,
     save_pdf_pages,
@@ -115,17 +113,6 @@ class TestSavePdfPages:
             assert doc.page_count == 1
 
 
-class TestHamming:
-    def test_identical_hashes_have_distance_zero(self):
-        assert hamming(0b1010, 0b1010) == 0
-
-    def test_completely_different_hashes(self):
-        assert hamming(0b0000, 0b1111) == 4
-
-    def test_single_bit_difference(self):
-        assert hamming(0b0001, 0b0000) == 1
-
-
 class TestRenderThumb:
     def test_creates_jpeg_file(self, tmp_path):
         doc = fitz.open()
@@ -143,24 +130,6 @@ class TestRenderThumb:
         render_thumb(doc[0], out, max_long_side=300)
         doc.close()
         assert out.exists()
-
-
-class TestAvgPhash:
-    def test_returns_int(self):
-        doc = fitz.open()
-        doc.new_page()
-        result = avg_phash(doc[0])
-        doc.close()
-        assert isinstance(result, int)
-
-    def test_identical_pages_have_identical_hash(self):
-        doc = fitz.open()
-        doc.new_page()
-        doc.new_page()
-        h1 = avg_phash(doc[0])
-        h2 = avg_phash(doc[1])
-        doc.close()
-        assert h1 == h2
 
 
 class TestListPdfs:
