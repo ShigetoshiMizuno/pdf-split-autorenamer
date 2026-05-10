@@ -31,6 +31,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 build = ["pyinstaller>=6.0"]
+llm = ["anthropic>=0.25", "keyring>=24.0"]
+paddle = ["paddleocr>=2.7"]
 
 [project.urls]
 Homepage = "https://github.com/ShigetoshiMizuno/pdf-split-autorenamer"
