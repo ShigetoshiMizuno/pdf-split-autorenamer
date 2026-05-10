@@ -483,3 +483,78 @@ class TestCmdServe:
             cmd_serve(args)
         call_kwargs = mock_serve.call_args
         assert call_kwargs.kwargs.get("auto_open") is False
+
+
+class TestCmdRenameWithActions:
+    def test_cmd_rename_with_non_empty_actions(self, tmp_path, capsys):
+        """アクションがある場合でもクラッシュせず 0 を返す（出力ループも実行される）"""
+        from pdf_split_autorenamer.cli import cmd_rename
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            apply=False,
+            retarget_unknown=False,
+            all=False,
+            pdftotext=None,
+            no_ocr_fallback=False,
+            profile=None,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {
+            "targets": 1,
+            "actions": [
+                {
+                    "status": "dry-run",
+                    "src": "scan_01.pdf",
+                    "src_display": "scan_01.pdf",
+                    "dst": "2026-04-06_週報.pdf",
+                    "date": "2026-04-06",
+                    "kind": "週報",
+                    "head": "週報テキスト",
+                }
+            ],
+            "applied": 0,
+        }
+        with patch("pdf_split_autorenamer.rename.run_rename", return_value=mock_result):
+            result = cmd_rename(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "dry-run" in captured.out or "dry-run" in captured.out
+
+    def test_cmd_rename_apply_prints_completed(self, tmp_path, capsys):
+        """apply=True のとき '完了: N 件' が出力される"""
+        from pdf_split_autorenamer.cli import cmd_rename
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            apply=True,
+            retarget_unknown=False,
+            all=False,
+            pdftotext=None,
+            no_ocr_fallback=False,
+            profile=None,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {
+            "targets": 1,
+            "actions": [
+                {
+                    "status": "ok",
+                    "src": "scan_01.pdf",
+                    "src_display": "scan_01.pdf",
+                    "dst": "2026-04-06_週報.pdf",
+                    "date": "2026-04-06",
+                    "kind": "週報",
+                    "head": "",
+                }
+            ],
+            "applied": 1,
+        }
+        with patch("pdf_split_autorenamer.rename.run_rename", return_value=mock_result):
+            result = cmd_rename(args)
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "完了" in captured.out
+        assert "1" in captured.out
