@@ -51,6 +51,18 @@ class TestAnalyzeParser:
         args = p.parse_args(["analyze", "./folder"])
         assert args.no_ocr_fallback is False
 
+    def test_analyze_yes_default_false(self):
+        """--yes のデフォルトは False"""
+        p = build_parser()
+        args = p.parse_args(["analyze", "./folder"])
+        assert args.yes is False
+
+    def test_analyze_yes_flag(self):
+        """--yes を付けると True になる"""
+        p = build_parser()
+        args = p.parse_args(["analyze", "./folder", "--yes"])
+        assert args.yes is True
+
     def test_analyze_no_ocr_fallback_flag(self):
         """--no-ocr-fallback を付けると True になる"""
         p = build_parser()
@@ -246,6 +258,50 @@ class TestCmdAnalyze:
         )
         mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
         with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
+            result = cmd_analyze(args)
+        assert result == 0
+
+    def test_cmd_analyze_llm_strategy_with_yes_skips_prompt(self, tmp_path):
+        """--ocr-strategy llm + --yes でプライバシー確認をスキップして実行する"""
+        from pdf_split_autorenamer.cli import cmd_analyze
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            pdftotext=None,
+            title="Test",
+            no_ocr_fallback=False,
+            ocr_strategy="llm",
+            yes=True,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
+        with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result) as mock_run:
+            result = cmd_analyze(args)
+        assert result == 0
+        mock_run.assert_called_once()
+        _, kwargs = mock_run.call_args
+        assert kwargs.get("ocr_strategy") == "llm"
+
+    def test_cmd_analyze_llm_strategy_non_tty_warns_and_continues(self, tmp_path):
+        """--ocr-strategy llm で非 TTY の場合、警告ログを出して続行する"""
+        from pdf_split_autorenamer.cli import cmd_analyze
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            pdftotext=None,
+            title="Test",
+            no_ocr_fallback=False,
+            ocr_strategy="llm",
+            yes=False,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
+        with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result), \
+             patch("sys.stdin.isatty", return_value=False):
             result = cmd_analyze(args)
         assert result == 0
 

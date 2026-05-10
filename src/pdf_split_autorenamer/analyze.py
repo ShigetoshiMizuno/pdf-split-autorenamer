@@ -44,6 +44,32 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 _JA_QUALITY_THRESHOLD = 0.1  # 日本語比率がこれ未満なら Stage 2 OCR を試みる
 
 
+try:
+    from .ocr_backend import ClaudeVisionBackend as ClaudeVisionBackend
+except Exception:  # pragma: no cover
+    ClaudeVisionBackend = None  # type: ignore[assignment,misc]
+
+
+def _try_llm_vision(roi_bytes: bytes) -> str:
+    """ClaudeVisionBackend で ROI 画像から日付・タイトルを構造化抽出。失敗時は ''。"""
+    try:
+        if ClaudeVisionBackend is None:
+            return ""
+        backend = ClaudeVisionBackend()
+        if not backend.is_available():
+            return ""
+        structured = backend.extract_structured(roi_bytes)
+        parts = []
+        if structured.get("date"):
+            parts.append(structured["date"])
+        if structured.get("title"):
+            parts.append(structured["title"])
+        return "\n".join(parts)
+    except Exception as e:
+        logging.warning("LLM Vision エラー: %s", e)
+        return ""
+
+
 def collect_pages(src_dir: Path, thumb_dir: Path,
                   pdftotext_path: str | None = None,
                   pdf_filter=None,
@@ -57,6 +83,8 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
         "fast"     — Stage 1 のみ（pdftotext / PyMuPDF）
         "balanced" — Stage 1 + テキスト空なら Tesseract（既定）
         "roi"      — Stage 1 + 日本語比率低い場合に上部 ROI クロップ + Tesseract
+        "llm"      — roi と同じ判定 + ClaudeVisionBackend で構造化抽出
+                     API キーなし/利用不可の場合は Tesseract にフォールバック
     """
     thumb_dir.mkdir(parents=True, exist_ok=True)
     pdftotext_path = pdftotext_path or find_pdftotext()
@@ -82,7 +110,7 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                 use_ocr = ocr_fallback and ocr_strategy != "fast"
                 text = extract_text(pdf_path, page_no, pdftotext_path,
                                     ocr_fallback=use_ocr)
-                if (ocr_strategy == "roi"
+                if (ocr_strategy in ("roi", "llm")
                         and calc_japanese_ratio(text) < _JA_QUALITY_THRESHOLD):
                     roi_bytes = crop_page_pixmap(page, ratio=0.3)
                     cache_path = get_ocr_cache_path(work_dir, roi_bytes)
@@ -90,10 +118,21 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                     if cached is not None:
                         text = cached
                     else:
-                        roi_text = extract_text_tesseract(roi_bytes)
-                        if roi_text.strip():
-                            text = roi_text
-                        write_ocr_cache(cache_path, text)
+                        if ocr_strategy == "llm":
+                            llm_text = _try_llm_vision(roi_bytes)
+                            if llm_text:
+                                text = llm_text
+                                write_ocr_cache(cache_path, text)
+                            else:
+                                roi_text = extract_text_tesseract(roi_bytes)
+                                if roi_text.strip():
+                                    text = roi_text
+                                write_ocr_cache(cache_path, text)
+                        else:
+                            roi_text = extract_text_tesseract(roi_bytes)
+                            if roi_text.strip():
+                                text = roi_text
+                            write_ocr_cache(cache_path, text)
                 head_text = "\n".join(
                     [l for l in textops.fix_mojibake(text).splitlines() if l.strip()][:3]
                 )[:200]
@@ -485,7 +524,8 @@ render();
 def run_analyze(src_dir: Path, work_dir: Path | None = None,
                 pdftotext_path: str | None = None,
                 title: str = "PDF 分割レビュー",
-                ocr_fallback: bool = True) -> dict:
+                ocr_fallback: bool = True,
+                ocr_strategy: str = "balanced") -> dict:
     """src_dir 配下のPDFを解析し、サムネ・groups.json・report.html を work_dir に出力。
     既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。"""
     src_dir = Path(src_dir)
@@ -503,7 +543,7 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
         return True
 
     pages = collect_pages(src_dir, thumb_dir, pdftotext_path, pdf_filter=_filter,
-                          ocr_fallback=ocr_fallback)
+                          ocr_fallback=ocr_fallback, ocr_strategy=ocr_strategy)
     if not pages:
         return {"pages": 0, "groups": 0}
     boundaries = build_boundary_info(pages)
