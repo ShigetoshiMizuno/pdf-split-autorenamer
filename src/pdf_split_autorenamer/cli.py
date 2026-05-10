@@ -114,11 +114,20 @@ def cmd_gui(args: argparse.Namespace) -> int:
     return gui.main(initial_folder=args.folder)
 
 
+def _get_version() -> str:
+    try:
+        from importlib.metadata import version
+        return version("pdf-split-autorenamer")
+    except Exception:
+        return "0.2.0"
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="psar",
         description="pdf-split-autorenamer: PDFをグループ別に分割し、内容ベースで自動リネーム",
     )
+    ap.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("analyze", help="PDFを解析してHTMLレポートを生成")
