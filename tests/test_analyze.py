@@ -4,6 +4,7 @@
 対象関数:
 - score_boundary(prev, cur) -> (float, list[str])
 - build_initial_groups(pages, boundary_threshold) -> dict[str, list[dict]]
+- HTML_TEMPLATE: saveJson 関数の http/file:// 分岐
 
 テストは実際の PDF ファイルを使わない pure-Python のユニットテスト。
 """
@@ -11,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from pdf_split_autorenamer.analyze import build_initial_groups, score_boundary
+from pdf_split_autorenamer.analyze import HTML_TEMPLATE, build_initial_groups, score_boundary
 
 
 # ---------------------------------------------------------------------------
@@ -221,3 +222,36 @@ class TestBuildInitialGroups:
             for g in groups:
                 all_pages.update(range(g["range"][0], g["range"][1] + 1))
         assert all_pages == {1, 2, 3, 4, 5}
+
+
+# ---------------------------------------------------------------------------
+# HTML_TEMPLATE の saveJson 関数: http/file:// 分岐
+# ---------------------------------------------------------------------------
+
+class TestHtmlTemplateSaveJson:
+    def test_fetch_api_call_present(self):
+        """HTML_TEMPLATE に fetch('/api/save-groups') の呼び出しが含まれる"""
+        assert "fetch('/api/save-groups'" in HTML_TEMPLATE or \
+               'fetch("/api/save-groups"' in HTML_TEMPLATE, \
+            "fetch('/api/save-groups') が HTML_TEMPLATE に含まれていない"
+
+    def test_http_protocol_check_present(self):
+        """HTML_TEMPLATE に window.location.protocol === 'http:' の分岐が含まれる"""
+        assert "window.location.protocol" in HTML_TEMPLATE, \
+            "window.location.protocol の分岐が HTML_TEMPLATE にない"
+
+    def test_download_fallback_present(self):
+        """HTML_TEMPLATE にファイルダウンロードのフォールバックが含まれる"""
+        assert "a.download" in HTML_TEMPLATE, \
+            "a.download のフォールバック処理が HTML_TEMPLATE にない"
+
+    def test_post_method_in_fetch(self):
+        """fetch 呼び出しで method: 'POST' が指定されている"""
+        assert "method: 'POST'" in HTML_TEMPLATE or \
+               'method: "POST"' in HTML_TEMPLATE, \
+            "fetch の method: 'POST' が HTML_TEMPLATE にない"
+
+    def test_content_type_json_in_fetch(self):
+        """fetch 呼び出しで Content-Type: application/json が指定されている"""
+        assert "application/json" in HTML_TEMPLATE, \
+            "Content-Type: application/json が HTML_TEMPLATE にない"

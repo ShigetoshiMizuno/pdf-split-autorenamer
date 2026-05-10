@@ -367,3 +367,119 @@ class TestMain:
         with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
             result = main(["analyze", str(tmp_path)])
         assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# serve サブコマンド
+# ---------------------------------------------------------------------------
+
+class TestServeParser:
+    def test_serve_folder_arg(self):
+        """serve サブコマンドで folder 引数が取得できる"""
+        p = build_parser()
+        args = p.parse_args(["serve", "./folder"])
+        assert args.folder == "./folder"
+
+    def test_serve_work_dir_default_none(self):
+        """--work-dir のデフォルトは None"""
+        p = build_parser()
+        args = p.parse_args(["serve", "./folder"])
+        assert args.work_dir is None
+
+    def test_serve_work_dir_custom(self):
+        """--work-dir でカスタム作業ディレクトリを指定できる"""
+        p = build_parser()
+        args = p.parse_args(["serve", "./folder", "--work-dir", "./custom"])
+        assert args.work_dir == "./custom"
+
+    def test_serve_port_default(self):
+        """--port のデフォルトは 8765"""
+        p = build_parser()
+        args = p.parse_args(["serve", "./folder"])
+        assert args.port == 8765
+
+    def test_serve_port_custom(self):
+        """--port でポート番号を変更できる"""
+        p = build_parser()
+        args = p.parse_args(["serve", "./folder", "--port", "9000"])
+        assert args.port == 9000
+
+    def test_serve_no_open_default_false(self):
+        """--no-open のデフォルトは False"""
+        p = build_parser()
+        args = p.parse_args(["serve", "./folder"])
+        assert args.no_open is False
+
+    def test_serve_no_open_flag(self):
+        """--no-open を付けると True になる"""
+        p = build_parser()
+        args = p.parse_args(["serve", "./folder", "--no-open"])
+        assert args.no_open is True
+
+    def test_serve_has_func(self):
+        """serve サブコマンドに func が設定されている"""
+        p = build_parser()
+        args = p.parse_args(["serve", "./folder"])
+        assert callable(args.func)
+
+
+class TestCmdServe:
+    def test_cmd_serve_file_not_found(self, tmp_path):
+        """report.html がない場合 FileNotFoundError をキャッチして 2 を返す"""
+        from pdf_split_autorenamer.cli import cmd_serve
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            port=8765,
+            no_open=True,
+        )
+        with patch("pdf_split_autorenamer.server.serve_report",
+                   side_effect=FileNotFoundError("report.html が見つかりません")):
+            result = cmd_serve(args)
+        assert result == 2
+
+    def test_cmd_serve_success(self, tmp_path):
+        """serve_report が正常に返ると 0 を返す"""
+        from pdf_split_autorenamer.cli import cmd_serve
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            port=8765,
+            no_open=True,
+        )
+        with patch("pdf_split_autorenamer.server.serve_report", return_value=None):
+            result = cmd_serve(args)
+        assert result == 0
+
+    def test_cmd_serve_passes_port(self, tmp_path):
+        """指定したポート番号が serve_report に渡される"""
+        from pdf_split_autorenamer.cli import cmd_serve
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            port=9999,
+            no_open=True,
+        )
+        with patch("pdf_split_autorenamer.server.serve_report", return_value=None) as mock_serve:
+            cmd_serve(args)
+        mock_serve.assert_called_once()
+        call_kwargs = mock_serve.call_args
+        assert call_kwargs.kwargs.get("port") == 9999
+
+    def test_cmd_serve_no_open_passed(self, tmp_path):
+        """--no-open が auto_open=False として serve_report に渡される"""
+        from pdf_split_autorenamer.cli import cmd_serve
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            port=8765,
+            no_open=True,
+        )
+        with patch("pdf_split_autorenamer.server.serve_report", return_value=None) as mock_serve:
+            cmd_serve(args)
+        call_kwargs = mock_serve.call_args
+        assert call_kwargs.kwargs.get("auto_open") is False
