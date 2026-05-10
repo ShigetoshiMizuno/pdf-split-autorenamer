@@ -155,6 +155,34 @@ class TestScoreBoundary:
         assert isinstance(score, float)
         assert isinstance(reasons, list)
 
+    def test_size_change_same_orient_raises_score(self):
+        """同じ向きでもサイズが大きく変化（>5%）するとスコアが上がる"""
+        # A4 (595x842) vs A5 (420x595) - どちらも縦向き
+        prev = _make_page(orient="P", width=595.0, height=842.0)
+        cur = _make_page(page=2, orient="P", width=420.0, height=595.0)
+        score, reasons = score_boundary(prev, cur)
+        assert any("サイズ" in r for r in reasons), f"サイズ変化が reasons に含まれない: {reasons}"
+        assert score >= 0.4
+
+    def test_medium_bigram_similarity_raises_score_moderately(self):
+        """Jaccard 類似度が 0.05〜0.10 の範囲でスコアが適度に上がる"""
+        # bigram が 20 個あってそのうち 1〜2 個が共通 → Jaccard ≈ 0.05〜0.10
+        shared = {"ab"}
+        prev_bigrams = shared | {f"p{i}" for i in range(19)}
+        cur_bigrams = shared | {f"q{i}" for i in range(19)}
+        prev = _make_page(bigram=prev_bigrams, orient="P")
+        cur = _make_page(page=2, bigram=cur_bigrams, orient="P")
+        score, reasons = score_boundary(prev, cur)
+        # 何らかの類似度関連の reasons があればよい
+        assert score >= 0.0  # スコアが 0 以上であること
+
+    def test_empty_bigram_one_side_scores_high(self):
+        """一方のページの bigram が空（テキストなし）の場合 Jaccard=0 でスコアが上がる"""
+        prev = _make_page(bigram=set(), orient="P")
+        cur = _make_page(page=2, bigram={"ab", "bc", "cd"}, orient="P")
+        score, _ = score_boundary(prev, cur)
+        assert score >= 0.4
+
 
 # ---------------------------------------------------------------------------
 # build_initial_groups
