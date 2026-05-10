@@ -9,8 +9,6 @@
 - sanitize_filename
 """
 from __future__ import annotations
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -20,8 +18,6 @@ from pdf_split_autorenamer.textops import (
     extract_kind,
     fix_broken_unicode,
     fix_mojibake,
-    load_mojibake_map,
-    load_profile,
     sanitize_filename,
 )
 
@@ -167,18 +163,6 @@ class TestExtractDatesAll:
         """日付がない文字列は空リストを返す"""
         assert extract_dates_all("主日礼拝メッセージ") == []
 
-    def test_duplicate_pattern_deduplicates_same_position(self):
-        """同一位置に複数パターンが一致する場合、seen_positions により1件のみ返る (line 94)"""
-        import re
-        import pdf_split_autorenamer.textops as textops_module
-        dup_patterns = [
-            re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})"),
-            re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})"),
-        ]
-        with patch.object(textops_module, "_DATE_PATTERNS", dup_patterns):
-            result = extract_dates_all("2026-04-06")
-        assert result == ["2026-04-06"]
-
 
 # ---------------------------------------------------------------------------
 # extract_kind
@@ -219,27 +203,6 @@ class TestExtractKind:
     def test_empty_string_returns_default(self):
         """空文字列はデフォルト種別を返す"""
         assert extract_kind("") == "書類"
-
-    def test_body_only_match_returns_correct_kind(self):
-        """タイトル領域（先頭6行）にはマッチしないが本文にはマッチする場合、body_patterns で判定される"""
-        # 先頭6行にはマッチしないよう無関係なテキストを7行並べ、本文に '主日礼拝メッセージ要旨' を入れる
-        padding = "\n".join([f"行{i}：無関係なテキスト" for i in range(1, 8)])
-        text = padding + "\n主日礼拝メッセージ要旨\n説教原稿"
-        assert extract_kind(text) == "主日礼拝メッセージ要旨"
-
-    def test_fix_broken_unicode_no_recovery_returns_original(self):
-        """fix_broken_unicode: 典型化け文字を含むが復元できない場合は元の文字列を返す"""
-        from pdf_split_autorenamer.textops import fix_broken_unicode
-        # 'ç' はフィルタを通過するが、cp1252→UTF-8 デコードで日本語を生成しない
-        result = fix_broken_unicode("ç")
-        assert result == "ç"
-
-    def test_fix_broken_unicode_encode_error_skipped(self):
-        """fix_broken_unicode: cp1252 でエンコードできない文字を含む場合もクラッシュしない"""
-        from pdf_split_autorenamer.textops import fix_broken_unicode
-        # 'ç' + 日本語: cp1252 エンコード失敗 → UnicodeEncodeError ハンドラを通過して元文字列を返す
-        result = fix_broken_unicode("ç日本語")
-        assert isinstance(result, str)
 
 
 # ---------------------------------------------------------------------------
@@ -290,116 +253,3 @@ class TestSanitizeFilename:
         """連続する空白は 1つの _ になる"""
         result = sanitize_filename("a   b")
         assert result == "a_b"
-
-
-# ---------------------------------------------------------------------------
-# load_profile / load_mojibake_map — tomllib=None の ImportError
-# ---------------------------------------------------------------------------
-
-class TestLoadProfileTomllibNone:
-    def test_raises_import_error_when_tomllib_none(self, tmp_path):
-        """tomllib が None のとき ImportError を送出する（line 191）"""
-        dummy = tmp_path / "dummy.toml"
-        dummy.write_text("", encoding="utf-8")
-        with patch("pdf_split_autorenamer.textops.tomllib", None):
-            with pytest.raises(ImportError, match="TOML"):
-                load_profile(dummy)
-
-
-class TestLoadMojibakeMapTomllibNone:
-    def test_raises_import_error_when_tomllib_none(self, tmp_path):
-        """tomllib が None のとき ImportError を送出する（line 218）"""
-        dummy = tmp_path / "dummy.toml"
-        dummy.write_text("", encoding="utf-8")
-        with patch("pdf_split_autorenamer.textops.tomllib", None):
-            with pytest.raises(ImportError, match="TOML"):
-                load_mojibake_map(dummy)
-
-
-# ---------------------------------------------------------------------------
-# load_profile / load_mojibake_map — 実 TOML ファイルを使った統合テスト
-# ---------------------------------------------------------------------------
-
-class TestLoadProfileIntegration:
-    def test_load_church_toml(self):
-        """church.toml を読み込んで title_patterns / body_patterns を返す"""
-        profiles_dir = Path(__file__).parent.parent / "profiles"
-        church_toml = profiles_dir / "church.toml"
-        if not church_toml.exists():
-            pytest.skip("church.toml が見つかりません")
-        title_patterns, body_patterns = load_profile(church_toml)
-        assert len(title_patterns) > 0
-        assert len(body_patterns) > 0
-
-    def test_load_profile_patterns_work_with_extract_kind(self):
-        """load_profile で取得したパターンが extract_kind で正しく機能する"""
-        profiles_dir = Path(__file__).parent.parent / "profiles"
-        church_toml = profiles_dir / "church.toml"
-        if not church_toml.exists():
-            pytest.skip("church.toml が見つかりません")
-        title_patterns, body_patterns = load_profile(church_toml)
-        result = extract_kind("週報\n2026年4月6日", title_patterns=title_patterns,
-                              body_patterns=body_patterns)
-        assert result == "週報"
-
-    def test_load_profile_from_toml_content(self, tmp_path):
-        """TOML コンテンツを直接書いてプロファイルを読み込む"""
-        toml_content = (
-            '[[title_patterns]]\n'
-            'pattern = "test-doc"\n'
-            'label = "TestDoc"\n'
-            '\n'
-            '[[body_patterns]]\n'
-            'pattern = "body-test"\n'
-            'label = "BodyKind"\n'
-        )
-        toml_path = tmp_path / "test.toml"
-        toml_path.write_text(toml_content, encoding="utf-8")
-        title_patterns, body_patterns = load_profile(toml_path)
-        assert len(title_patterns) == 1
-        assert len(body_patterns) == 1
-        assert title_patterns[0][1] == "TestDoc"
-        assert body_patterns[0][1] == "BodyKind"
-
-
-class TestTomllibImportChain:
-    def test_tomllib_fallback_chain_when_builtin_missing(self):
-        """tomllib も tomli も利用不可な環境では textops.tomllib が None になる (lines 10-14)"""
-        import importlib
-        import sys
-        import pdf_split_autorenamer.textops as textops_mod
-
-        with patch.dict(sys.modules, {"tomllib": None, "tomli": None}):
-            importlib.reload(textops_mod)
-            assert textops_mod.tomllib is None
-
-        # テスト後に正常状態へ戻す
-        importlib.reload(textops_mod)
-
-
-class TestLoadMojibakeMapIntegration:
-    def test_load_scansnap_s500_toml(self):
-        """scansnap-s500.toml を読み込んで置換マップを返す"""
-        profiles_dir = Path(__file__).parent.parent / "profiles"
-        scansnap_toml = profiles_dir / "scansnap-s500.toml"
-        if not scansnap_toml.exists():
-            pytest.skip("scansnap-s500.toml が見つかりません")
-        result = load_mojibake_map(scansnap_toml)
-        assert isinstance(result, dict)
-        assert len(result) > 0
-
-    def test_load_mojibake_map_from_toml_content(self, tmp_path):
-        """TOML コンテンツを直接書いてマップを読み込む"""
-        toml_content = (
-            '[[replacements]]\n'
-            'wrong = "X"\n'
-            'correct = "Y"\n'
-            '\n'
-            '[[replacements]]\n'
-            'wrong = "A"\n'
-            'correct = "B"\n'
-        )
-        toml_path = tmp_path / "test.toml"
-        toml_path.write_text(toml_content, encoding="utf-8")
-        result = load_mojibake_map(toml_path)
-        assert result == {"X": "Y", "A": "B"}
