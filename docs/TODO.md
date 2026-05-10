@@ -71,7 +71,7 @@ v1.0.0:
 - [x] プロファイル TOML フォーマットの定義（title_patterns / body_patterns の正規表現リスト）
 - [x] `textops.load_profile(path: Path) -> tuple[list, list]` を追加
 - [x] `psar rename --profile <path>` オプション追加
-- [ ] GUI にプロファイル選択欄追加（v1.0 持ち越し）
+- [x] GUI にプロファイル選択欄追加（Step 3 リネームセクションに TOML ファイル選択ボタン追加）
 - [x] サンプルプロファイル（`profiles/church.toml`、`profiles/business.toml`）を同梱
 
 ### T-03: GitHub Actions 自動ビルド ※ v0.2.5（v0.2 完了後に着手）
