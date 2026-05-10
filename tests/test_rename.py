@@ -22,6 +22,7 @@ from pdf_split_autorenamer.rename import (
     find_targets,
     make_plan,
     resolve_filenames,
+    run_rename,
 )
 
 
@@ -374,3 +375,80 @@ class TestMakePlan:
         """空リストを渡すと空リストが返る"""
         result = make_plan([], ocr_fallback=False)
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# fallback_title（名前部分ありケース）
+# ---------------------------------------------------------------------------
+
+class TestFallbackTitleNonEmpty:
+    def test_name_part_extracted_and_returned(self):
+        """split 形式ファイル名から名前部分を取り出して返す"""
+        result = fallback_title("scan_01_週報.pdf")
+        assert result == "週報"
+
+    def test_date_in_name_part_is_stripped(self):
+        """名前部分に日付が含まれていれば除去される"""
+        result = fallback_title("scan_01_2026-04-06_週報.pdf")
+        assert "2026" not in result
+        assert "04" not in result
+        assert "06" not in result
+
+    def test_max_30_chars(self):
+        """名前部分が長い場合でも 30 文字以下に切り詰められる"""
+        long_name = "a" * 50
+        result = fallback_title(f"scan_01_{long_name}.pdf")
+        assert len(result) <= 30
+
+
+# ---------------------------------------------------------------------------
+# run_rename
+# ---------------------------------------------------------------------------
+
+class TestRunRename:
+    def _make_pdf(self, tmp_path, name: str, text: str = "2026-04-06"):
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), text)
+        data = doc.write()
+        doc.close()
+        p = tmp_path / name
+        p.write_bytes(data)
+        return p
+
+    def test_no_targets_returns_empty_actions(self, tmp_path):
+        """対象ファイルがない場合は空のアクションリストを返す"""
+        result = run_rename(tmp_path, mode="split", apply=False)
+        assert result["targets"] == 0
+        assert result["actions"] == []
+        assert result["applied"] == 0
+
+    def test_dry_run_does_not_rename(self, tmp_path):
+        """dry-run は実際にリネームしない"""
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        result = run_rename(tmp_path, mode="split", apply=False, ocr_fallback=False)
+        assert result["targets"] == 1
+        assert result["actions"][0]["status"] == "dry-run"
+        assert (tmp_path / "scan_01.pdf").exists()
+
+    def test_apply_true_renames_file(self, tmp_path):
+        """apply=True で実際にリネームされる"""
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        result = run_rename(tmp_path, mode="split", apply=True, ocr_fallback=False)
+        assert result["applied"] == 1
+        assert result["actions"][0]["status"] == "ok"
+        assert not (tmp_path / "scan_01.pdf").exists()
+
+    def test_conflict_when_dst_exists(self, tmp_path):
+        """リネーム先が既に存在する場合は conflict を返す"""
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        # make_plan が使う dst を事前に作成してコンフリクトを誘発
+        # kindが「書類」の場合: 日付不明_書類.pdf or 2026-04-06_書類.pdf
+        # 事前に rename して候補ファイルを作り、別の scan_01.pdf で再実行
+        result_first = run_rename(tmp_path, mode="split", apply=True, ocr_fallback=False)
+        # scan_01.pdf はリネーム済み。新しい scan_01.pdf を作ってコンフリクトを確認
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        result_second = run_rename(tmp_path, mode="split", apply=True, ocr_fallback=False)
+        statuses = [a["status"] for a in result_second["actions"]]
+        assert any(s in ("conflict", "noop") for s in statuses)
