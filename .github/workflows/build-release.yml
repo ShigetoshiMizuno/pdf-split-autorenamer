@@ -1,0 +1,53 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_suffix: windows.exe
+            dist_name: psar.exe
+          - os: macos-latest
+            artifact_suffix: macos
+            dist_name: psar
+          - os: ubuntu-latest
+            artifact_suffix: linux
+            dist_name: psar
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[build]"
+
+      - name: Build with PyInstaller
+        shell: bash
+        run: |
+          pyinstaller \
+            --onefile \
+            --name psar \
+            --collect-all fitz \
+            src/pdf_split_autorenamer/__main__.py
+
+      - name: Rename artifact
+        shell: bash
+        run: mv dist/${{ matrix.dist_name }} dist/psar-${{ matrix.artifact_suffix }}
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/psar-${{ matrix.artifact_suffix }}
+          generate_release_notes: true
