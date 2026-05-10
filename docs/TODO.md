@@ -169,7 +169,9 @@ v1.0.0:
 - [x] `test_split.py`: `normalize_groups`, `run_split`（dry-run は実PDF不要な normalize_groups のみ）
 - [x] `test_rename.py`: `choose_date`, `resolve_filenames`, `run_rename`（dry-run）
 - [x] GitHub Actions に pytest ジョブを追加（test.yml）
-- [x] カバレッジ目標: 70% → 達成（non-GUI 81%、全体 63%）
+- [x] カバレッジ目標: 70% → 達成（全体 77%、analyze 100%、rename 95%、split 96%、server 97%、cli 93%）
+  - 351 テスト（v1.0-ux ブランチ時点）
+  - gui.py は headless 環境で未実行のため全体を下げている（non-GUI 換算では 90%+）
 
 ### T-11: PyPI 公開
 - [Issue なし] [担当: PRGちゃん] [推定: 0.5日]
