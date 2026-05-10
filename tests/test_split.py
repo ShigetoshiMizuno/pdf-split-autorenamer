@@ -3,14 +3,21 @@
 
 対象関数:
 - normalize_groups(raw) -> dict[str, list[dict]]
+- run_split（groups.json + 実際の PDF を使った統合テスト）
 
-run_split は実際の PDF が必要なのでテストスコープ外（skip）。
+run_split の純 Python ロジック（missing PDF, out-of-range, dry-run, skip-exists）は
+PDF を生成して確認する。
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import fitz
 import pytest
 
-from pdf_split_autorenamer.split import normalize_groups
+from pdf_split_autorenamer.split import normalize_groups, run_split
+from pdf_split_autorenamer.textops import sanitize_filename
 
 
 # ---------------------------------------------------------------------------
@@ -122,9 +129,136 @@ class TestNormalizeGroups:
 
 
 # ---------------------------------------------------------------------------
-# run_split は実際の PDF が必要なのでスキップ
+# sanitize_filename（textops.sanitize_filename を split から利用）
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="run_split は実際の PDF ファイルが必要なのでスコープ外")
-def test_run_split_requires_real_pdf():
-    pass
+class TestSanitizeFilename:
+    def test_removes_forbidden_chars(self):
+        """Windows 禁止文字 (<>:"/\\|?*) を除去する"""
+        result = sanitize_filename('file<>:"/\\|?*.pdf')
+        for ch in '<>:"/\\|?*':
+            assert ch not in result
+
+    def test_replaces_whitespace_with_underscore(self):
+        """空白をアンダースコアに変換する"""
+        result = sanitize_filename("hello world")
+        assert " " not in result
+        assert "_" in result
+
+    def test_empty_string_returns_empty(self):
+        """空文字列は空文字列を返す"""
+        assert sanitize_filename("") == ""
+
+    def test_normal_japanese_name_unchanged(self):
+        """禁止文字がない日本語ファイル名はそのまま返る"""
+        result = sanitize_filename("週報2026年4月")
+        assert result == "週報2026年4月"
+
+    def test_max_length_80(self):
+        """デフォルト max_length=80 で切り詰められる"""
+        result = sanitize_filename("a" * 100)
+        assert len(result) <= 80
+
+    def test_custom_max_length(self):
+        """max_length を指定するとその長さに切り詰められる"""
+        result = sanitize_filename("a" * 50, max_length=10)
+        assert len(result) <= 10
+
+    def test_trailing_dots_and_spaces_removed(self):
+        """末尾のピリオドと空白が除去される"""
+        result = sanitize_filename("filename. ")
+        assert not result.endswith(".")
+        assert not result.endswith(" ")
+
+
+# ---------------------------------------------------------------------------
+# run_split — groups.json + PDF を使った統合テスト
+# ---------------------------------------------------------------------------
+
+def _make_multipage_pdf(pages: list[str]) -> bytes:
+    """複数ページの PDF を bytes で返す"""
+    doc = fitz.open()
+    for text in pages:
+        page = doc.new_page()
+        page.insert_text((72, 72), text, fontsize=12)
+    data = doc.write()
+    doc.close()
+    return data
+
+
+def _write_groups_json(work_dir: Path, content: dict) -> Path:
+    """work_dir に groups.json を書き込んで Path を返す"""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    p = work_dir / "groups.json"
+    p.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+    return p
+
+
+class TestRunSplit:
+    def test_raises_if_no_groups_json(self, tmp_path):
+        """groups.json が存在しない場合 FileNotFoundError が発生する"""
+        with pytest.raises(FileNotFoundError):
+            run_split(tmp_path)
+
+    def test_missing_pdf_logged_as_missing(self, tmp_path):
+        """PDF が存在しない場合、actions に status='missing' が入る"""
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"nonexistent.pdf": [{"range": [1, 1], "name": ""}]},
+        )
+        result = run_split(tmp_path)
+        statuses = [a["status"] for a in result["actions"]]
+        assert "missing" in statuses
+
+    def test_dry_run_does_not_write_files(self, tmp_path):
+        """dry_run=True では PDF ファイルが書き出されない"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 1], "name": ""}]},
+        )
+        result = run_split(tmp_path, dry_run=True)
+        # 書き出しなし
+        assert result["files_written"] == 0
+        statuses = [a["status"] for a in result["actions"]]
+        assert "dry-run" in statuses
+
+    def test_out_of_range_group_skipped(self, tmp_path):
+        """範囲外ページを指定したグループはスキップされる"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 99], "name": ""}]},
+        )
+        result = run_split(tmp_path)
+        statuses = [a["status"] for a in result["actions"]]
+        assert "out-of-range" in statuses
+
+    def test_split_writes_file(self, tmp_path):
+        """正常なグループ指定で PDF が書き出される"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 1], "name": "週報"}]},
+        )
+        result = run_split(tmp_path)
+        assert result["files_written"] == 1
+        assert (tmp_path / "source_01_週報.pdf").exists()
+
+    def test_skip_existing_without_force(self, tmp_path):
+        """既存ファイルがある場合 force=False でスキップされる"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
+        # 出力先ファイルを事前に作成
+        (tmp_path / "source_01.pdf").write_bytes(b"dummy")
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 1], "name": ""}]},
+        )
+        result = run_split(tmp_path, force=False)
+        statuses = [a["status"] for a in result["actions"]]
+        assert "skip-exists" in statuses
+        assert result["files_skipped"] == 1
