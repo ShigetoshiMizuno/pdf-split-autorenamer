@@ -245,3 +245,63 @@ cp932 になることがある。`cli.py` の冒頭で `sys.stdout.reconfigure(e
 `textops.py` に `_KEEP_CHARS` 正規表現が定義されていたが、`sanitize_filename()` 内で
 参照されておらず、実装途上の残骸だった。T-04b でこの未使用定義を削除した。
 サニタイズは `_INVALID_NAME` による禁止文字除去のみで行われており、動作に変更なし。
+
+---
+
+## 8. テスト戦略・カバレッジ知見
+
+### 達成状況（2026-05-11 時点）
+
+- **429 テスト、全体 100%**（1052/1052 statements）
+- feature/v1.0-ux ブランチ（PR #12）にて達成
+
+### Tkinter GUI のテスト方法
+
+`gui.py`（`App(tk.Tk)` サブクラス）を headless 環境でテストするために以下の戦略を使用：
+
+1. **`App.__init__` をモック + 属性を手動注入**（`test_gui_profile.py` / `test_gui_extra.py`）
+   ```python
+   with patch.object(gui_module.App, "__init__", return_value=None):
+       app = gui_module.App()
+   app.__dict__.update({"folder_var": _StringVar(), ...})
+   ```
+
+2. **`ttk` / `tk` を MagicMock に置換して `_build_ui` を実行**
+   - `patch.object(gui_module, "ttk", MagicMock())` でウィジェット生成を無害化
+   - `logging.getLogger` もモックしてハンドラ登録を防ぐ
+
+3. **`if __name__ == "__main__"` ガードの実行**（line 375）
+   - `runpy.run_module("pdf_split_autorenamer.gui", run_name="__main__")` は fresh namespace を使うため `patch("gui.App")` が効かない
+   - 解決策: `tkinter.Tk` / `tkinter.ttk.*` を直接パッチしてから `runpy.run_module` を呼ぶ
+
+4. **`_run_async`（スレッド）のテスト**
+   - `patch.object(app, "after", side_effect=lambda delay, fn, *a: fn(*a))` で `after()` を同期的に実行
+   - `threading.Event` で非同期完了を待機（`event.wait(timeout=3)`）
+
+### `importlib.reload` を使うモジュールレベルコードのカバレッジ
+
+```python
+# cli.py lines 13-14: stdout.reconfigure の例外握り潰し
+import importlib
+sys.stdout.reconfigure = lambda encoding: raise_exception()
+importlib.reload(cli_mod)
+# ← reload 後は必ず restore すること
+```
+
+### `runpy.run_module` で `if __name__ == "__main__"` をカバー
+
+```python
+with patch("sys.argv", ["psar", "analyze", str(tmp_path)]):
+    with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
+        with pytest.raises(SystemExit):
+            runpy.run_module("pdf_split_autorenamer.cli", run_name="__main__")
+```
+
+注意: 既存モジュールを再実行するため `RuntimeWarning` が出ることがある（無害）。
+
+### 実質的に到達不可能な行
+
+以下は実環境テストでは到達できないが、上記テクニックでカバー：
+- `cli.py` lines 13-14: `sys.stdout.reconfigure` が失敗する環境（一部 IDLE / embedded Python）
+- `textops.py` lines 10-14: Python < 3.11 の tomllib 代替インポートチェーン
+- `gui.py` line 375: `if __name__ == "__main__"` ガード（直接スクリプト実行のみ）
