@@ -129,6 +129,22 @@ class TestScoreBoundary:
         assert score > 0
         assert any("タイトル" in r for r in reasons)
 
+    def test_default_similar_reason_when_no_other_signal(self):
+        # j=1.0 (identical text), same orient/size, no new titles → default "類似" reason
+        text = "週報 二〇二六年四月六日"
+        p1 = self._make_page(text=text)
+        p2 = self._make_page(text=text)
+        score, reasons = score_boundary(p1, p2)
+        assert any("類似" in r for r in reasons)
+        assert score == 0.0
+
+    def test_score_capped_at_1(self):
+        # Multiple signals → score would exceed 1 without min() cap
+        p1 = self._make_page(orient="P", text="abc", markers=[])
+        p2 = self._make_page(orient="L", w=842, h=595, text="", markers=["第1号"])
+        score, _ = score_boundary(p1, p2)
+        assert score <= 1.0
+
     def test_very_low_jaccard_similarity(self):
         # j = 0.0 (one side empty) → "テキスト類似極低" branch (lines 108-109)
         p1 = self._make_page(text="abcdefg")  # non-empty bigrams
