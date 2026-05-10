@@ -81,3 +81,5 @@ desktop.ini
 _*.txt
 _*.py
 !**/__main__.py
+# ベンチマーク結果（生成ファイル）
+tests/fixtures/benchmark/results*.json
