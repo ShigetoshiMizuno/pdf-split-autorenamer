@@ -29,16 +29,16 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     from . import analyze
     src = Path(args.folder).resolve()
     if not src.is_dir():
-        logging.error("not a directory: %s", src)
+        logging.error("ディレクトリが存在しません: %s", src)
         return 2
     work = Path(args.work_dir).resolve() if args.work_dir else None
-    print(f"Analyzing PDFs in: {src}")
+    print(f"PDF を解析中: {src}")
     res = analyze.run_analyze(src, work_dir=work, pdftotext_path=args.pdftotext,
                               title=args.title,
                               ocr_fallback=not args.no_ocr_fallback)
-    print(f"  pages: {res.get('pages', 0)}")
-    print(f"  initial groups: {res.get('groups', 0)}")
-    print(f"  report: {res.get('report_html', '')}")
+    print(f"  ページ数: {res.get('pages', 0)}")
+    print(f"  初期グループ数: {res.get('groups', 0)}")
+    print(f"  レポート: {res.get('report_html', '')}")
     print(f"  groups.json: {res.get('groups_json', '')}")
     print()
     print(f"次の手順: ブラウザで report.html を開き、境界とファイル名を編集して")
@@ -92,7 +92,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
                             profile=profile)
     print(f"対象: {res['targets']} 件 / モード: {mode}")
     print()
-    print(f"{'STATUS':10} OLD -> NEW")
+    print(f"{'状態':10} 変更前 -> 変更後")
     print("-" * 100)
     for a in res["actions"]:
         st = a["status"]
