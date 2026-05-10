@@ -41,10 +41,17 @@ def fix_mojibake(s: str, extra_map: dict[str, str] | None = None) -> str:
     return s
 
 
+# UTF-8→cp1252 化けで頻出する典型文字（事前フィルタ用）
+_BROKEN_UNICODE_CHARS = frozenset("çåïÃ»æèéÂÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß")
+
+
 def fix_broken_unicode(s: str) -> str:
     """Windows でファイル名が UTF-8 バイトを cp1252/Latin-1 として保存された化けを復元する。
     例: 'ç§å¸«' → '牧師' / 部分破損は errors='replace' で許容。"""
     if not s:
+        return s
+    # 典型的な化け文字が含まれていない場合は復元を試みない（誤判定防止）
+    if not any(c in _BROKEN_UNICODE_CHARS for c in s):
         return s
     for enc in ("cp1252", "latin-1"):
         try:
