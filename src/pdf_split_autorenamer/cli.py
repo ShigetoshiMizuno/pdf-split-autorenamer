@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -13,11 +14,22 @@ except Exception:
     pass
 
 
+def _setup_logging(verbose: bool = False, quiet: bool = False) -> None:
+    level = logging.DEBUG if verbose else (logging.WARNING if quiet else logging.INFO)
+    logging.basicConfig(
+        format="%(levelname)s: %(message)s",
+        level=level,
+        stream=sys.stderr,
+        force=True,
+    )
+
+
 def cmd_analyze(args: argparse.Namespace) -> int:
+    _setup_logging(args.verbose, args.quiet)
     from . import analyze
     src = Path(args.folder).resolve()
     if not src.is_dir():
-        print(f"ERROR: not a directory: {src}", file=sys.stderr)
+        logging.error("not a directory: %s", src)
         return 2
     work = Path(args.work_dir).resolve() if args.work_dir else None
     print(f"Analyzing PDFs in: {src}")
@@ -34,13 +46,14 @@ def cmd_analyze(args: argparse.Namespace) -> int:
 
 
 def cmd_split(args: argparse.Namespace) -> int:
+    _setup_logging(args.verbose, args.quiet)
     from . import split
     src = Path(args.folder).resolve()
     work = Path(args.work_dir).resolve() if args.work_dir else None
     try:
         res = split.run_split(src, work_dir=work, dry_run=args.dry_run, force=args.force)
     except FileNotFoundError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+        logging.error("%s", e)
         return 2
 
     print(f"入力ページ合計: {res['total_input_pages']}")
@@ -62,6 +75,7 @@ def cmd_split(args: argparse.Namespace) -> int:
 
 
 def cmd_rename(args: argparse.Namespace) -> int:
+    _setup_logging(args.verbose, args.quiet)
     from . import rename
     src = Path(args.folder).resolve()
     if args.retarget_unknown:
@@ -108,6 +122,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
     sp.add_argument("--pdftotext", help="pdftotext.exe のパス (省略時は自動検出)")
     sp.add_argument("--title", default="PDF 分割レビュー", help="HTMLレポートのタイトル")
+    sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
+    sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_analyze)
 
     sp = sub.add_parser("split", help="groups.json に従って分割を実行")
@@ -115,6 +131,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
     sp.add_argument("--dry-run", action="store_true", help="計画のみ表示")
     sp.add_argument("--force", action="store_true", help="既存ファイルを上書き")
+    sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
+    sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_split)
 
     sp = sub.add_parser("rename", help="内容ベースで自動リネーム")
@@ -124,6 +142,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="日付不明_*.pdf を再考対象にする")
     sp.add_argument("--all", action="store_true", help="分割直後＋日付不明 両方")
     sp.add_argument("--pdftotext", help="pdftotext.exe のパス (省略時は自動検出)")
+    sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
+    sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_rename)
 
     sp = sub.add_parser("gui", help="Tkinter GUI を起動")

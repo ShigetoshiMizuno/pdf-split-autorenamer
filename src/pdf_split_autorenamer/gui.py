@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import logging
 import sys
 import threading
 import tkinter as tk
@@ -19,6 +20,22 @@ from tkinter import filedialog, messagebox, ttk
 from . import analyze as _analyze
 from . import rename as _rename
 from . import split as _split
+
+
+class _TextHandler(logging.Handler):
+    """logging のメッセージを Tkinter の Text ウィジェットに転送するハンドラ"""
+
+    def __init__(self, text_widget):
+        super().__init__()
+        self._widget = text_widget
+
+    def emit(self, record):
+        msg = self.format(record)
+        self._widget.after(0, self._append, msg)
+
+    def _append(self, msg):
+        self._widget.insert("end", msg + "\n")
+        self._widget.see("end")
 
 
 class App(tk.Tk):
@@ -85,6 +102,11 @@ class App(tk.Tk):
         self.log.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.log.pack(side="left", fill="both", expand=True)
+
+        # logging ハンドラをログエリアに接続
+        handler = _TextHandler(self.log)
+        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        logging.getLogger().addHandler(handler)
 
         # ステータスバー
         self.status_var = tk.StringVar(value="待機中")

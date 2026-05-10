@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -56,7 +57,7 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
         try:
             doc = fitz.open(stream=pdf_path.read_bytes(), filetype="pdf")
         except Exception as e:
-            print(f"open failed: {pdf_path.name}: {e}")
+            logging.warning("open failed: %s: %s", pdf_path.name, e)
             continue
         try:
             for i in range(doc.page_count):

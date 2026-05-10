@@ -2,6 +2,7 @@
 """PDFの内容（OCR埋め込みテキスト）から日付・書類タイプを推定して自動リネームする"""
 from __future__ import annotations
 
+import logging
 import re
 from collections import Counter
 from pathlib import Path
@@ -182,6 +183,7 @@ def run_rename(src_dir: Path, mode: str = "split", apply: bool = False,
                 action["status"] = "ok"
                 applied += 1
             except Exception as e:
+                logging.error("failed to rename %s: %s", src.name, e)
                 action["status"] = f"error: {e}"
         else:
             action["status"] = "dry-run"
