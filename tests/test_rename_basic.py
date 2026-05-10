@@ -9,6 +9,7 @@ import pytest
 
 from pdf_split_autorenamer.rename import (
     choose_date,
+    date_from_filename,
     existing_name_part,
     fallback_title,
     find_targets,
@@ -40,6 +41,19 @@ class TestExistingNamePart:
 
     def test_plain_filename_returns_empty(self):
         assert existing_name_part("scan.pdf") == ""
+
+
+class TestDateFromFilename:
+    def test_extracts_date_from_name_part(self):
+        # "scan_01_2026-04-06.pdf" → name_part="2026-04-06" → date
+        assert date_from_filename("scan_01_2026-04-06.pdf") == "2026-04-06"
+
+    def test_returns_none_for_no_date(self):
+        assert date_from_filename("scan_01.pdf") is None
+
+    def test_returns_none_for_dated_file(self):
+        # DATED_PAT file: existing_name_part returns "週報", no date in "週報"
+        assert date_from_filename("2026-04-06_週報.pdf") is None
 
 
 class TestChooseDate:
