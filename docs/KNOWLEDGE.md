@@ -305,3 +305,15 @@ with patch("sys.argv", ["psar", "analyze", str(tmp_path)]):
 - `cli.py` lines 13-14: `sys.stdout.reconfigure` が失敗する環境（一部 IDLE / embedded Python）
 - `textops.py` lines 10-14: Python < 3.11 の tomllib 代替インポートチェーン
 - `gui.py` line 375: `if __name__ == "__main__"` ガード（直接スクリプト実行のみ）
+
+### Python 3.11 editable install で `__main__` サブモジュールが見えない
+
+`from pdf_split_autorenamer.__main__ import main` は Python 3.12 では動くが、
+Python 3.11 + setuptools editable install 環境では
+`ModuleNotFoundError: No module named 'pdf_split_autorenamer.__main__'` になる。
+
+**原因**: Python 3.11 の setuptools editable finder が `__main__` を特殊名として除外している。
+
+**対処**: テストを削除し、`__main__.py` line 6 (`raise SystemExit(main())`) の
+1 statement は未カバーとして受け入れる（総カバレッジ 99%）。
+CI を 3.12 に切り替えれば解消するが、3.11 サポートを続ける限りはこの制限が残る。
