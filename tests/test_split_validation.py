@@ -86,6 +86,22 @@ class TestRunSplitErrors:
         assert summary["actions"][0]["status"] == "skip-exists"
         assert summary["files_skipped"] == 1
 
+    def test_force_overwrites_existing_file(self, tmp_path):
+        src_pdf = tmp_path / "scan.pdf"
+        _make_pdf(src_pdf, pages=2)
+        # Pre-create the output file
+        (tmp_path / "scan_01.pdf").write_bytes(b"%PDF-1.4")
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        (work_dir / "groups.json").write_text(
+            json.dumps({"scan.pdf": [{"range": [1, 2], "name": ""}]}),
+            encoding="utf-8",
+        )
+        summary = run_split(tmp_path, work_dir=work_dir, force=True)
+        assert summary["actions"][0]["status"] == "ok"
+        assert summary["files_written"] == 1
+        assert summary["files_skipped"] == 0
+
     def test_dry_run_no_files_written(self, tmp_path):
         src_pdf = tmp_path / "scan.pdf"
         _make_pdf(src_pdf, pages=2)
