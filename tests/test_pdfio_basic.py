@@ -47,6 +47,16 @@ class TestFindPdftotext:
         result = find_pdftotext()
         assert result == str(fake_exe)
 
+    def test_finds_from_candidate_paths(self, monkeypatch):
+        # Mocks Path.is_file to True so the first Windows candidate is returned (line 34)
+        monkeypatch.delenv("PDFTOTEXT", raising=False)
+        from unittest.mock import patch
+        with patch("shutil.which", return_value=None):
+            with patch("pathlib.Path.is_file", return_value=True):
+                result = find_pdftotext()
+        assert result is not None
+        assert result.endswith("pdftotext.exe")
+
 
 class TestExtractTextPymupdf:
     def test_extracts_text_from_pdf(self, tmp_path):
