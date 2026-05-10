@@ -8,9 +8,6 @@ FR-1-2: collect_pages が extract_text 経由で動くこと
 """
 from __future__ import annotations
 
-import io
-import struct
-import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

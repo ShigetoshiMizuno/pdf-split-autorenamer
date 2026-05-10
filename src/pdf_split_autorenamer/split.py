@@ -62,7 +62,7 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
             )
             continue
         import fitz
-        with fitz.open(src) as src_doc:
+        with fitz.open(stream=src.read_bytes(), filetype="pdf") as src_doc:
             page_count = src_doc.page_count
         summary["total_input_pages"] += page_count
 
