@@ -1,0 +1,82 @@
+# --- Secrets / credentials (絶対にコミットしないもの) ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+*.pfx
+secrets/
+credentials.json
+service_account*.json
+*_credentials.json
+*.token
+*.tokens
+api_keys.txt
+config.local.*
+.aws/
+.gcp/
+.azure/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# --- venv / pyenv ---
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# --- 作業ディレクトリ・ユーザデータ ---
+# psar の作業フォルダ。ユーザの実データを誤って公開しないように除外
+.psar/
+*/.psar/
+
+# テスト用のサンプルPDFも除外（ユーザの個人文書をリポジトリに入れない）
+examples/sample_pdfs/
+sample_pdfs/
+test_pdfs/
+*.pdf
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- ログ・一時ファイル ---
+*.log
+*.tmp
+_*.txt
+_*.py
