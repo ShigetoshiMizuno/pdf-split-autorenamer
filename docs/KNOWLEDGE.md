@@ -306,3 +306,32 @@ if len(samples) < 64:
 PyMuPDF が強制する最小ページサイズ（1pt × 1pt）では
 `zoom = 8/max(1, 1) = 8` となり、ピクスマップは 8×8 = 64 サンプルになる。
 実際のPDFでは 64 未満になることはほぼない（防衛的コードとして維持）。
+
+---
+
+## 9. fitz `insert_text()` で埋め込んだ CJK テキストは抽出できない
+
+### 症状
+
+テスト用 PDF を `fitz.open()` + `page.insert_text((50, 50), "週報")` で作成しても、
+`page.get_text()` で日本語テキストが返ってこない（空文字または文字化け）。
+
+### 原因
+
+`insert_text()` はデフォルトフォント（Helvetica 等の Type1 フォント）を使用するが、
+このフォントには日本語グリフが存在しない。PyMuPDF は埋め込みに失敗しても
+例外を上げず、`ToUnicode` テーブルを持たないグリフとして格納してしまう。
+結果として `get_text()` は空文字列か `?` を返す。
+
+### 対処
+
+- **統合テスト**: fitz で作成した PDF の CJK テキスト内容に依存するアサーションを書かない。
+  - 代わりに「ファイルが存在する」「件数が正しい」「ステータスが 'ok'」等を検証する。
+- **本番コード**: 実際のスキャン PDF（Tesseract / pdftotext 経由）は問題なし。
+- **将来の参考実装**: CJK テキスト埋め込みが必要なら `reportlab` や CJK フォント付きの
+  `fitz` フォント指定（`fontfile=` パラメータ）を使うこと。
+
+### 参考
+
+- PyMuPDF Issue: insert_text with CJK chars silently fails without CJK font
+- 影響テスト: `tests/test_integration.py` の `test_split_then_rename` 等
