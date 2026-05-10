@@ -395,6 +395,22 @@ class TestMain:
         assert result == 0
 
 
+class TestGetVersion:
+    def test_returns_version_string(self):
+        """_get_version() が文字列を返す"""
+        from pdf_split_autorenamer.cli import _get_version
+        result = _get_version()
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_fallback_when_importlib_raises(self):
+        """importlib.metadata.version が例外を起こしたとき '0.2.0' を返す（lines 133-134）"""
+        from pdf_split_autorenamer.cli import _get_version
+        with patch("importlib.metadata.version", side_effect=Exception("not found")):
+            result = _get_version()
+        assert result == "0.2.0"
+
+
 # ---------------------------------------------------------------------------
 # serve サブコマンド
 # ---------------------------------------------------------------------------
