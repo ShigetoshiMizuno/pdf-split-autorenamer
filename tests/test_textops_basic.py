@@ -50,6 +50,13 @@ class TestFixBrokenUnicode:
         result = fix_broken_unicode("ç")
         assert result == "ç"  # unchanged, no Japanese found
 
+    def test_unicode_encode_error_falls_through(self):
+        # "çあ": ç triggers the broken-unicode check; あ (U+3042) cannot be encoded in
+        # cp1252 or latin-1, so both s.encode(enc) calls raise UnicodeEncodeError (lines 59-60).
+        # No encoding succeeds → return s unchanged (line 68).
+        result = fix_broken_unicode("çあ")
+        assert result == "çあ"  # unchanged, encode failed for both encodings
+
 
 class TestExtractDatesAll:
     def test_iso_format(self):
