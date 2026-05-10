@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""split.py: _validate_groups / run_split 検証ロジックのテスト（Issue #9 / FR-2-7）"""
+"""split.py: _validate_groups / run_split / normalize_groups のテスト（Issue #9 / FR-2-7）"""
 from __future__ import annotations
 
 import json
@@ -9,7 +9,7 @@ from pathlib import Path
 import fitz
 import pytest
 
-from pdf_split_autorenamer.split import _validate_groups, run_split
+from pdf_split_autorenamer.split import _validate_groups, normalize_groups, run_split
 
 
 def _make_pdf(path: Path, pages: int = 3) -> Path:
@@ -19,6 +19,112 @@ def _make_pdf(path: Path, pages: int = 3) -> Path:
     doc.save(str(path))
     doc.close()
     return path
+
+
+class TestNormalizeGroups:
+    def test_dict_schema_passthrough(self):
+        raw = {"scan.pdf": [{"range": [1, 3], "name": "test"}]}
+        result = normalize_groups(raw)
+        assert result["scan.pdf"][0]["range"] == [1, 3]
+
+    def test_list_schema_converted(self):
+        raw = {"scan.pdf": [[1, 3]]}
+        result = normalize_groups(raw)
+        assert result["scan.pdf"][0]["range"] == [1, 3]
+        assert result["scan.pdf"][0]["name"] == ""
+
+    def test_invalid_item_skipped(self):
+        raw = {"scan.pdf": ["invalid_string"]}
+        result = normalize_groups(raw)
+        assert result["scan.pdf"] == []
+
+    def test_short_list_skipped(self):
+        raw = {"scan.pdf": [[1]]}  # only 1 element, not 2
+        result = normalize_groups(raw)
+        assert result["scan.pdf"] == []
+
+    def test_none_rng_skipped(self):
+        raw = {"scan.pdf": [{"name": "no-range"}]}  # no range/pages key
+        result = normalize_groups(raw)
+        assert result["scan.pdf"] == []
+
+    def test_pages_key_accepted(self):
+        raw = {"scan.pdf": [{"pages": [1, 3], "name": ""}]}
+        result = normalize_groups(raw)
+        assert result["scan.pdf"][0]["range"] == [1, 3]
+
+
+class TestRunSplitErrors:
+    def test_missing_groups_json_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            run_split(tmp_path)
+
+    def test_out_of_range_logged(self, tmp_path):
+        src_pdf = tmp_path / "scan.pdf"
+        _make_pdf(src_pdf, pages=2)
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        (work_dir / "groups.json").write_text(
+            json.dumps({"scan.pdf": [{"range": [1, 10], "name": ""}]}),
+            encoding="utf-8",
+        )
+        summary = run_split(tmp_path, work_dir=work_dir, dry_run=True)
+        assert summary["actions"][0]["status"] == "out-of-range"
+
+    def test_skip_existing_file(self, tmp_path):
+        src_pdf = tmp_path / "scan.pdf"
+        _make_pdf(src_pdf, pages=2)
+        # Create the output file so it "already exists"
+        (tmp_path / "scan_01.pdf").write_bytes(b"%PDF-1.4")
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        (work_dir / "groups.json").write_text(
+            json.dumps({"scan.pdf": [{"range": [1, 2], "name": ""}]}),
+            encoding="utf-8",
+        )
+        summary = run_split(tmp_path, work_dir=work_dir)
+        assert summary["actions"][0]["status"] == "skip-exists"
+        assert summary["files_skipped"] == 1
+
+    def test_dry_run_no_files_written(self, tmp_path):
+        src_pdf = tmp_path / "scan.pdf"
+        _make_pdf(src_pdf, pages=2)
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        (work_dir / "groups.json").write_text(
+            json.dumps({"scan.pdf": [{"range": [1, 2], "name": ""}]}),
+            encoding="utf-8",
+        )
+        summary = run_split(tmp_path, work_dir=work_dir, dry_run=True)
+        assert summary["actions"][0]["status"] == "dry-run"
+        assert summary["files_written"] == 0
+
+    def test_actual_split_writes_file(self, tmp_path):
+        src_pdf = tmp_path / "scan.pdf"
+        _make_pdf(src_pdf, pages=2)
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        (work_dir / "groups.json").write_text(
+            json.dumps({"scan.pdf": [{"range": [1, 2], "name": ""}]}),
+            encoding="utf-8",
+        )
+        summary = run_split(tmp_path, work_dir=work_dir)
+        assert summary["files_written"] == 1
+        assert (tmp_path / "scan_01.pdf").exists()
+
+    def test_named_group_includes_name_in_filename(self, tmp_path):
+        src_pdf = tmp_path / "scan.pdf"
+        _make_pdf(src_pdf, pages=2)
+        work_dir = tmp_path / ".psar"
+        work_dir.mkdir()
+        (work_dir / "groups.json").write_text(
+            json.dumps({"scan.pdf": [{"range": [1, 2], "name": "週報"}]}),
+            encoding="utf-8",
+        )
+        summary = run_split(tmp_path, work_dir=work_dir)
+        assert summary["files_written"] == 1
+        out_name = summary["actions"][0]["out"]
+        assert "週報" in out_name
 
 
 class TestValidateGroupsDuplicate:
