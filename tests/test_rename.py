@@ -22,6 +22,7 @@ from pdf_split_autorenamer.rename import (
     find_targets,
     make_plan,
     resolve_filenames,
+    run_rename,
 )
 
 
@@ -329,6 +330,24 @@ class TestFindTargets:
         result = find_targets(tmp_path, mode="split")
         assert result == []
 
+    def test_all_mode_excludes_dated_non_unknown_files(self, tmp_path):
+        """all モードでも YYYY-MM-DD_*.pdf（非日付不明）は除外される（line 90 pass→continue）"""
+        (tmp_path / "scan_01.pdf").write_bytes(b"")
+        (tmp_path / "2026-04-06_週報.pdf").write_bytes(b"")  # DATED_PAT match, not UNKNOWN_PAT
+        result = find_targets(tmp_path, mode="all")
+        names = [p.name for p in result]
+        assert "scan_01.pdf" in names
+        assert "2026-04-06_週報.pdf" not in names
+
+    def test_non_file_pdf_glob_result_skipped(self, tmp_path):
+        """glob が返す *.pdf がファイルでない（ディレクトリ）場合はスキップ (line 83)"""
+        # *.pdf という名前のディレクトリを作成する
+        pdf_dir = tmp_path / "scan_01.pdf"
+        pdf_dir.mkdir()
+        result = find_targets(tmp_path, mode="split")
+        # ディレクトリは含まれない
+        assert len(result) == 0
+
 
 # ---------------------------------------------------------------------------
 # make_plan
@@ -374,3 +393,105 @@ class TestMakePlan:
         """空リストを渡すと空リストが返る"""
         result = make_plan([], ocr_fallback=False)
         assert result == []
+
+    def test_make_plan_kind_from_filename_when_text_generic(self, tmp_path):
+        """テキストから kind が決まらないとき、ファイル名のヒントで kind を補完する（line 123）"""
+        # scan_01_週報.pdf という名前にする → existing_name_part → "週報" → extract_kind → "週報"
+        p = self._make_pdf(tmp_path, "scan_01_週報.pdf", "2026-04-06")
+        result = make_plan([p], ocr_fallback=False)
+        # テキスト "2026-04-06" は kind を "書類" にする（パターン不一致）
+        # ファイル名ヒント "週報" から kind が "週報" に補完される
+        assert result[0]["kind"] == "週報"
+
+
+# ---------------------------------------------------------------------------
+# fallback_title（名前部分ありケース）
+# ---------------------------------------------------------------------------
+
+class TestFallbackTitleNonEmpty:
+    def test_name_part_extracted_and_returned(self):
+        """split 形式ファイル名から名前部分を取り出して返す"""
+        result = fallback_title("scan_01_週報.pdf")
+        assert result == "週報"
+
+    def test_date_in_name_part_is_stripped(self):
+        """名前部分に日付が含まれていれば除去される"""
+        result = fallback_title("scan_01_2026-04-06_週報.pdf")
+        assert "2026" not in result
+        assert "04" not in result
+        assert "06" not in result
+
+    def test_max_30_chars(self):
+        """名前部分が長い場合でも 30 文字以下に切り詰められる"""
+        long_name = "a" * 50
+        result = fallback_title(f"scan_01_{long_name}.pdf")
+        assert len(result) <= 30
+
+
+# ---------------------------------------------------------------------------
+# run_rename
+# ---------------------------------------------------------------------------
+
+class TestRunRename:
+    def _make_pdf(self, tmp_path, name: str, text: str = "2026-04-06"):
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), text)
+        data = doc.write()
+        doc.close()
+        p = tmp_path / name
+        p.write_bytes(data)
+        return p
+
+    def test_noop_when_file_already_correctly_named(self, tmp_path):
+        """リネーム先が同一ファイルのとき status='noop' を返す（line 197）"""
+        self._make_pdf(tmp_path, "日付不明_書類.pdf", "no date here generic text")
+        result = run_rename(tmp_path, mode="unknown", apply=True, ocr_fallback=False)
+        statuses = [a["status"] for a in result["actions"]]
+        assert "noop" in statuses
+
+    def test_rename_error_logged_as_error_status(self, tmp_path):
+        """src.rename() が失敗したとき status に 'error:' が含まれる（lines 203-205）"""
+        from unittest.mock import patch
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        with patch("pathlib.Path.rename", side_effect=PermissionError("access denied")):
+            result = run_rename(tmp_path, mode="split", apply=True, ocr_fallback=False)
+        statuses = [a["status"] for a in result["actions"]]
+        assert any("error" in s for s in statuses)
+
+    def test_no_targets_returns_empty_actions(self, tmp_path):
+        """対象ファイルがない場合は空のアクションリストを返す"""
+        result = run_rename(tmp_path, mode="split", apply=False)
+        assert result["targets"] == 0
+        assert result["actions"] == []
+        assert result["applied"] == 0
+
+    def test_dry_run_does_not_rename(self, tmp_path):
+        """dry-run は実際にリネームしない"""
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        result = run_rename(tmp_path, mode="split", apply=False, ocr_fallback=False)
+        assert result["targets"] == 1
+        assert result["actions"][0]["status"] == "dry-run"
+        assert (tmp_path / "scan_01.pdf").exists()
+
+    def test_apply_true_renames_file(self, tmp_path):
+        """apply=True で実際にリネームされる"""
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        result = run_rename(tmp_path, mode="split", apply=True, ocr_fallback=False)
+        assert result["applied"] == 1
+        assert result["actions"][0]["status"] == "ok"
+        assert not (tmp_path / "scan_01.pdf").exists()
+
+    def test_conflict_when_dst_exists(self, tmp_path):
+        """リネーム先が既に存在する場合は conflict を返す"""
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        # make_plan が使う dst を事前に作成してコンフリクトを誘発
+        # kindが「書類」の場合: 日付不明_書類.pdf or 2026-04-06_書類.pdf
+        # 事前に rename して候補ファイルを作り、別の scan_01.pdf で再実行
+        result_first = run_rename(tmp_path, mode="split", apply=True, ocr_fallback=False)
+        # scan_01.pdf はリネーム済み。新しい scan_01.pdf を作ってコンフリクトを確認
+        self._make_pdf(tmp_path, "scan_01.pdf", "2026-04-06")
+        result_second = run_rename(tmp_path, mode="split", apply=True, ocr_fallback=False)
+        statuses = [a["status"] for a in result_second["actions"]]
+        assert any(s in ("conflict", "noop") for s in statuses)

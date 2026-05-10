@@ -69,7 +69,7 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
         try:
             doc = fitz.open(stream=pdf_path.read_bytes(), filetype="pdf")
         except Exception as e:
-            logging.warning("open failed: %s: %s", pdf_path.name, e)
+            logging.warning("PDF を開けませんでした: %s: %s", pdf_path.name, e)
             continue
         try:
             for i in range(doc.page_count):
@@ -82,7 +82,6 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                 use_ocr = ocr_fallback and ocr_strategy != "fast"
                 text = extract_text(pdf_path, page_no, pdftotext_path,
                                     ocr_fallback=use_ocr)
-                # Stage 2 ROI OCR: テキスト品質が低い場合に上部クロップで再試行
                 if (ocr_strategy == "roi"
                         and calc_japanese_ratio(text) < _JA_QUALITY_THRESHOLD):
                     roi_bytes = crop_page_pixmap(page, ratio=0.3)
@@ -249,6 +248,7 @@ main{ max-width:1100px; margin:0 auto; padding:16px;}
 .namebox label{ font-size:11px; color:var(--muted);}
 .namebox input{ flex:1; font-size:13px; padding:4px 6px; border:1px solid #99c; border-radius:3px; min-width:0;}
 .preview{ font-size:11px; color:#06a; margin-top:2px;}
+.ocr-empty{ background:#fff3cd; border:1px solid #ffc107; color:#856404; font-size:11px; padding:3px 6px; border-radius:3px; margin-top:4px; display:inline-block;}
 </style>
 </head>
 <body>
@@ -404,6 +404,12 @@ function render() {
     const pre = document.createElement('pre');
     pre.textContent = p.head || '(テキストなし)';
     meta.appendChild(pre);
+    if (!p.head || p.head.trim() === '') {
+      const warn = document.createElement('span');
+      warn.className = 'ocr-empty';
+      warn.textContent = '⚠ OCR テキスト空（Tesseract OCR を検討してください）';
+      meta.appendChild(warn);
+    }
     row.appendChild(meta);
     sec.appendChild(row);
   }
@@ -439,12 +445,29 @@ function buildGroupsFromFlags() {
 }
 function saveJson() {
   const data = buildGroupsFromFlags();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'groups.json'; a.click();
-  URL.revokeObjectURL(url);
-  alert('groups.json をダウンロードしました。\n作業ディレクトリ (.psar) に上書き保存してから\n分割を実行してください。');
+  const jsonStr = JSON.stringify(data, null, 2);
+  if (window.location.protocol === 'http:') {
+    // psar serve モード: サーバーに直接保存
+    fetch('/api/save-groups', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: jsonStr
+    }).then(r => {
+      if (r.ok) {
+        alert('groups.json を保存しました。\n分割を実行するには psar split を実行してください。');
+      } else {
+        r.text().then(t => alert('保存失敗: ' + t));
+      }
+    }).catch(e => alert('保存失敗: ' + e));
+  } else {
+    // file:// プロトコル: 従来のダウンロード
+    const blob = new Blob([jsonStr], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'groups.json'; a.click();
+    URL.revokeObjectURL(url);
+    alert('groups.json をダウンロードしました。\n作業ディレクトリ (.psar) に上書き保存してから\n分割を実行してください。');
+  }
 }
 function resetGroups() {
   if (!confirm('初期境界とファイル名を初期状態に戻します。よろしいですか?')) return;
@@ -462,8 +485,7 @@ render();
 def run_analyze(src_dir: Path, work_dir: Path | None = None,
                 pdftotext_path: str | None = None,
                 title: str = "PDF 分割レビュー",
-                ocr_fallback: bool = True,
-                ocr_strategy: str = "balanced") -> dict:
+                ocr_fallback: bool = True) -> dict:
     """src_dir 配下のPDFを解析し、サムネ・groups.json・report.html を work_dir に出力。
     既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。"""
     src_dir = Path(src_dir)
@@ -481,7 +503,7 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
         return True
 
     pages = collect_pages(src_dir, thumb_dir, pdftotext_path, pdf_filter=_filter,
-                          ocr_fallback=ocr_fallback, ocr_strategy=ocr_strategy)
+                          ocr_fallback=ocr_fallback)
     if not pages:
         return {"pages": 0, "groups": 0}
     boundaries = build_boundary_info(pages)

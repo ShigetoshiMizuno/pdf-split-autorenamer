@@ -155,12 +155,12 @@ class TestSplitUsesLogging:
             (work / "groups.json").write_text(
                 json.dumps(groups), encoding="utf-8"
             )
-            with patch("pdf_split_autorenamer.split.logging") as mock_logging:
+            with patch("pdf_split_autorenamer.split.logger") as mock_logger:
                 from pdf_split_autorenamer.split import run_split
                 run_split(tmp, work_dir=work)
 
-            assert mock_logging.warning.called, \
-                "PDF が存在しないときに logging.warning が呼ばれていない"
+            assert mock_logger.warning.called, \
+                "PDF が存在しないときに logger.warning が呼ばれていない"
 
 
 # ---------------------------------------------------------------------------

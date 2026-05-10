@@ -9,6 +9,8 @@ from pathlib import Path
 from .pdfio import save_pdf_pages
 from .textops import sanitize_filename
 
+logger = logging.getLogger(__name__)
+
 
 def normalize_groups(raw: dict) -> dict[str, list[dict]]:
     """旧スキーマ ([from,to]) と新スキーマ ({range:[from,to], name:""}) を吸収する"""
@@ -31,6 +33,22 @@ def normalize_groups(raw: dict) -> dict[str, list[dict]]:
     return out
 
 
+def _validate_groups(pdf_name: str, items: list[dict], page_count: int) -> None:
+    """ページ重複と未カバーページを警告する（FR-2-7）"""
+    covered: set[int] = set()
+    for it in items:
+        a, b = it["range"]
+        if a < 1 or b > page_count or a > b:
+            continue
+        for p in range(a, b + 1):
+            if p in covered:
+                logger.warning("[%s] ページ %d が複数グループに重複しています", pdf_name, p)
+            covered.add(p)
+    uncovered = sorted(set(range(1, page_count + 1)) - covered)
+    if uncovered:
+        logger.info("[%s] 未カバーページ（出力なし）: %s", pdf_name, uncovered)
+
+
 def run_split(src_dir: Path, work_dir: Path | None = None,
               dry_run: bool = False, force: bool = False) -> dict:
     """work_dir/groups.json に基づいて src_dir のPDFを分割。
@@ -42,7 +60,7 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     groups_path = work_dir / "groups.json"
     if not groups_path.exists():
-        raise FileNotFoundError(f"groups.json not found: {groups_path}")
+        raise FileNotFoundError(f"groups.json が見つかりません: {groups_path}")
 
     raw = json.loads(groups_path.read_text(encoding="utf-8"))
     groups = normalize_groups(raw)
@@ -58,7 +76,7 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
     for pdf_name, items in groups.items():
         src = src_dir / pdf_name
         if not src.exists():
-            logging.warning("PDF not found, skipping: %s", pdf_name)
+            logger.warning("[%s] groups.json に記載されたPDFが見つかりません", pdf_name)
             summary["actions"].append(
                 {"src": pdf_name, "status": "missing"}
             )
@@ -67,12 +85,13 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
         with fitz.open(stream=src.read_bytes(), filetype="pdf") as src_doc:
             page_count = src_doc.page_count
         summary["total_input_pages"] += page_count
+        _validate_groups(pdf_name, items, page_count)
 
         for idx, it in enumerate(items, start=1):
             a, b = it["range"]
             if a < 1 or b > page_count or a > b:
-                logging.warning(
-                    "out-of-range group skipped: %s pages %s-%s", pdf_name, a, b
+                logger.warning(
+                    "範囲外グループをスキップします: %s ページ %s-%s", pdf_name, a, b
                 )
                 summary["actions"].append({
                     "src": pdf_name, "range": [a, b],
@@ -101,7 +120,7 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
                     summary["files_written"] += 1
                     summary["total_output_pages"] += (b - a + 1)
                 except Exception as e:
-                    logging.error("failed to write %s: %s", out_name, e)
+                    logger.error("書き込みに失敗しました %s: %s", out_name, e)
                     action["status"] = f"error: {e}"
             summary["actions"].append(action)
 

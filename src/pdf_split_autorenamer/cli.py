@@ -29,17 +29,16 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     from . import analyze
     src = Path(args.folder).resolve()
     if not src.is_dir():
-        logging.error("not a directory: %s", src)
+        logging.error("ディレクトリが存在しません: %s", src)
         return 2
     work = Path(args.work_dir).resolve() if args.work_dir else None
-    print(f"Analyzing PDFs in: {src}")
+    print(f"PDF を解析中: {src}")
     res = analyze.run_analyze(src, work_dir=work, pdftotext_path=args.pdftotext,
                               title=args.title,
-                              ocr_fallback=not args.no_ocr_fallback,
-                              ocr_strategy=getattr(args, "ocr_strategy", "balanced"))
-    print(f"  pages: {res.get('pages', 0)}")
-    print(f"  initial groups: {res.get('groups', 0)}")
-    print(f"  report: {res.get('report_html', '')}")
+                              ocr_fallback=not args.no_ocr_fallback)
+    print(f"  ページ数: {res.get('pages', 0)}")
+    print(f"  初期グループ数: {res.get('groups', 0)}")
+    print(f"  レポート: {res.get('report_html', '')}")
     print(f"  groups.json: {res.get('groups_json', '')}")
     print()
     print(f"次の手順: ブラウザで report.html を開き、境界とファイル名を編集して")
@@ -93,7 +92,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
                             profile=profile)
     print(f"対象: {res['targets']} 件 / モード: {mode}")
     print()
-    print(f"{'STATUS':10} OLD -> NEW")
+    print(f"{'状態':10} 変更前 -> 変更後")
     print("-" * 100)
     for a in res["actions"]:
         st = a["status"]
@@ -110,9 +109,29 @@ def cmd_rename(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from . import server
+    src = Path(args.folder).resolve()
+    work = Path(args.work_dir).resolve() if args.work_dir else None
+    try:
+        server.serve_report(src, work_dir=work, port=args.port, auto_open=not args.no_open)
+    except FileNotFoundError as e:
+        logging.error("%s", e)
+        return 2
+    return 0
+
+
 def cmd_gui(args: argparse.Namespace) -> int:
     from . import gui
     return gui.main(initial_folder=args.folder)
+
+
+def _get_version() -> str:
+    try:
+        from importlib.metadata import version
+        return version("pdf-split-autorenamer")
+    except Exception:
+        return "0.2.0"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -120,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="psar",
         description="pdf-split-autorenamer: PDFをグループ別に分割し、内容ベースで自動リネーム",
     )
+    ap.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("analyze", help="PDFを解析してHTMLレポートを生成")
@@ -158,6 +178,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_rename)
+
+    sp = sub.add_parser("serve", help="report.html をローカルHTTPで配信（groups.json 直接保存）")
+    sp.add_argument("folder", help="PDFが入っているフォルダ")
+    sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
+    sp.add_argument("--port", type=int, default=8765, help="HTTPポート番号 (既定: 8765)")
+    sp.add_argument("--no-open", action="store_true", help="ブラウザを自動で開かない")
+    sp.set_defaults(func=cmd_serve)
 
     sp = sub.add_parser("gui", help="Tkinter GUI を起動")
     sp.add_argument("--folder", help="初期フォルダ")

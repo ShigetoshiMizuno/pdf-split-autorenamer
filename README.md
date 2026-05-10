@@ -1,5 +1,9 @@
 # pdf-split-autorenamer
 
+[![PyPI version](https://badge.fury.io/py/pdf-split-autorenamer.svg)](https://pypi.org/project/pdf-split-autorenamer/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+
 OCR テキストが埋め込まれたスキャンPDF群を、**書類ごとのグループに自動分割**し、
 **内容ベースで `YYYY-MM-DD_書類タイプ.pdf` に自動リネーム**するツールです。
 

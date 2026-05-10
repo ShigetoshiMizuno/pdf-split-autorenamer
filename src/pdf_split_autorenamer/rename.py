@@ -201,7 +201,7 @@ def run_rename(src_dir: Path, mode: str = "split", apply: bool = False,
                 action["status"] = "ok"
                 applied += 1
             except Exception as e:
-                logging.error("failed to rename %s: %s", src.name, e)
+                logging.error("リネームに失敗しました %s: %s", src.name, e)
                 action["status"] = f"error: {e}"
         else:
             action["status"] = "dry-run"
