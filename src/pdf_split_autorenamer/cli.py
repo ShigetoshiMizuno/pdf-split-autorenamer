@@ -31,11 +31,26 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     if not src.is_dir():
         logging.error("ディレクトリが存在しません: %s", src)
         return 2
+    if getattr(args, "ocr_strategy", "balanced") == "llm" and not getattr(args, "yes", False):
+        msg = (
+            "警告: --ocr-strategy llm を使用すると、PDF ページ画像が"
+            " Anthropic の Claude API（クラウド）に送信されます。\n"
+            "送信内容: 各ページ上部 30% のクロップ画像"
+        )
+        if sys.stdin.isatty():
+            print(msg, file=sys.stderr)
+            ans = input("続行しますか？ [y/N]: ")
+            if ans.strip().lower() not in ("y", "yes"):
+                print("中止しました。", file=sys.stderr)
+                return 1
+        else:
+            logging.warning("%s --yes を付けると確認をスキップできます。", msg)
     work = Path(args.work_dir).resolve() if args.work_dir else None
     print(f"PDF を解析中: {src}")
     res = analyze.run_analyze(src, work_dir=work, pdftotext_path=args.pdftotext,
                               title=args.title,
-                              ocr_fallback=not args.no_ocr_fallback)
+                              ocr_fallback=not args.no_ocr_fallback,
+                              ocr_strategy=getattr(args, "ocr_strategy", "balanced"))
     print(f"  ページ数: {res.get('pages', 0)}")
     print(f"  初期グループ数: {res.get('groups', 0)}")
     print(f"  レポート: {res.get('report_html', '')}")
@@ -152,6 +167,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--ocr-strategy", default="balanced",
                     choices=["fast", "balanced", "roi", "thorough", "llm"],
                     help="OCR 戦略: fast/balanced/roi/thorough/llm")
+    sp.add_argument("--yes", action="store_true",
+                    help="--ocr-strategy llm 時のクラウド送信確認をスキップ")
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_analyze)

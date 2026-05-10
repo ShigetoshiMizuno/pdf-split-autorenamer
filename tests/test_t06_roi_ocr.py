@@ -221,3 +221,123 @@ class TestCollectPagesOcrStrategy:
             pages = analyze.collect_pages(tmp_path, tmp_path / "thumbs", ocr_strategy="roi")
 
         assert any("ROI抽出テキスト" in p.get("text", "") for p in pages)
+
+
+# ---------------------------------------------------------------------------
+# ocr_strategy="llm" パス
+# ---------------------------------------------------------------------------
+
+class TestCollectPagesLlmStrategy:
+    def _make_fake_pdf(self, name: str = "test.pdf") -> MagicMock:
+        p = MagicMock(spec=Path)
+        p.name = name
+        p.stem = name.replace(".pdf", "")
+        p.read_bytes.return_value = b"%PDF fake"
+        return p
+
+    def _make_fake_doc(self):
+        fake_page = MagicMock()
+        fake_page.rect = MagicMock()
+        fake_page.rect.width = 595.0
+        fake_page.rect.height = 842.0
+        fake_doc = MagicMock()
+        fake_doc.page_count = 1
+        fake_doc.__getitem__ = MagicMock(return_value=fake_page)
+        fake_doc.close = MagicMock()
+        return fake_doc, fake_page
+
+    def test_llm_strategy_success_uses_llm_text(self, tmp_path):
+        """llm strategy で LLM Vision が成功した場合、日付+タイトルを text に格納する"""
+        from pdf_split_autorenamer import analyze
+        fake_pdf = self._make_fake_pdf()
+        fake_doc, _ = self._make_fake_doc()
+
+        with patch("pdf_split_autorenamer.analyze.list_pdfs", return_value=[fake_pdf]), \
+             patch("pdf_split_autorenamer.analyze.fitz") as mock_fitz, \
+             patch("pdf_split_autorenamer.analyze.extract_text", return_value=""), \
+             patch("pdf_split_autorenamer.analyze.crop_page_pixmap", return_value=b"png"), \
+             patch("pdf_split_autorenamer.analyze.get_ocr_cache_path", return_value=tmp_path / "cache.txt"), \
+             patch("pdf_split_autorenamer.analyze.read_ocr_cache", return_value=None), \
+             patch("pdf_split_autorenamer.analyze._try_llm_vision", return_value="2026-04-06\n主日礼拝メッセージ要旨") as mock_llm, \
+             patch("pdf_split_autorenamer.analyze.write_ocr_cache"), \
+             patch("pdf_split_autorenamer.analyze.render_thumb"):
+            mock_fitz.open.return_value = fake_doc
+            pages = analyze.collect_pages(tmp_path, tmp_path / "thumbs", ocr_strategy="llm")
+
+        mock_llm.assert_called_once()
+        assert any("2026-04-06" in p.get("text", "") for p in pages)
+
+    def test_llm_strategy_not_available_falls_back_to_tesseract(self, tmp_path):
+        """llm strategy で LLM が利用不可（空文字列）の場合、Tesseract にフォールバック"""
+        from pdf_split_autorenamer import analyze
+        fake_pdf = self._make_fake_pdf()
+        fake_doc, _ = self._make_fake_doc()
+
+        with patch("pdf_split_autorenamer.analyze.list_pdfs", return_value=[fake_pdf]), \
+             patch("pdf_split_autorenamer.analyze.fitz") as mock_fitz, \
+             patch("pdf_split_autorenamer.analyze.extract_text", return_value=""), \
+             patch("pdf_split_autorenamer.analyze.crop_page_pixmap", return_value=b"png"), \
+             patch("pdf_split_autorenamer.analyze.get_ocr_cache_path", return_value=tmp_path / "cache.txt"), \
+             patch("pdf_split_autorenamer.analyze.read_ocr_cache", return_value=None), \
+             patch("pdf_split_autorenamer.analyze._try_llm_vision", return_value=""), \
+             patch("pdf_split_autorenamer.analyze.extract_text_tesseract", return_value="Tesseractテキスト") as mock_tess, \
+             patch("pdf_split_autorenamer.analyze.write_ocr_cache"), \
+             patch("pdf_split_autorenamer.analyze.render_thumb"):
+            mock_fitz.open.return_value = fake_doc
+            pages = analyze.collect_pages(tmp_path, tmp_path / "thumbs", ocr_strategy="llm")
+
+        mock_tess.assert_called_once()
+        assert any("Tesseractテキスト" in p.get("text", "") for p in pages)
+
+    def test_llm_strategy_cache_hit_skips_llm(self, tmp_path):
+        """llm strategy でキャッシュヒットの場合は LLM を呼ばない"""
+        from pdf_split_autorenamer import analyze
+        fake_pdf = self._make_fake_pdf()
+        fake_doc, _ = self._make_fake_doc()
+
+        with patch("pdf_split_autorenamer.analyze.list_pdfs", return_value=[fake_pdf]), \
+             patch("pdf_split_autorenamer.analyze.fitz") as mock_fitz, \
+             patch("pdf_split_autorenamer.analyze.extract_text", return_value=""), \
+             patch("pdf_split_autorenamer.analyze.crop_page_pixmap", return_value=b"png"), \
+             patch("pdf_split_autorenamer.analyze.get_ocr_cache_path", return_value=tmp_path / "cache.txt"), \
+             patch("pdf_split_autorenamer.analyze.read_ocr_cache", return_value="キャッシュ済みテキスト"), \
+             patch("pdf_split_autorenamer.analyze._try_llm_vision") as mock_llm, \
+             patch("pdf_split_autorenamer.analyze.render_thumb"):
+            mock_fitz.open.return_value = fake_doc
+            pages = analyze.collect_pages(tmp_path, tmp_path / "thumbs", ocr_strategy="llm")
+
+        mock_llm.assert_not_called()
+        assert any("キャッシュ済みテキスト" in p.get("text", "") for p in pages)
+
+
+# ---------------------------------------------------------------------------
+# _try_llm_vision ヘルパー
+# ---------------------------------------------------------------------------
+
+class TestTryLlmVision:
+    def test_returns_date_and_title_when_available(self):
+        """ClaudeVisionBackend が利用可能なら date + title を返す"""
+        from pdf_split_autorenamer.analyze import _try_llm_vision
+        mock_backend = MagicMock()
+        mock_backend.is_available.return_value = True
+        mock_backend.extract_structured.return_value = {"date": "2026-04-06", "title": "週報"}
+        with patch("pdf_split_autorenamer.analyze.ClaudeVisionBackend", return_value=mock_backend):
+            result = _try_llm_vision(b"fake_image")
+        assert "2026-04-06" in result
+        assert "週報" in result
+
+    def test_returns_empty_when_not_available(self):
+        """ClaudeVisionBackend が利用不可なら空文字列を返す"""
+        from pdf_split_autorenamer.analyze import _try_llm_vision
+        mock_backend = MagicMock()
+        mock_backend.is_available.return_value = False
+        with patch("pdf_split_autorenamer.analyze.ClaudeVisionBackend", return_value=mock_backend):
+            result = _try_llm_vision(b"fake_image")
+        assert result == ""
+
+    def test_returns_empty_on_exception(self):
+        """例外が発生した場合は空文字列を返す"""
+        from pdf_split_autorenamer.analyze import _try_llm_vision
+        with patch("pdf_split_autorenamer.analyze.ClaudeVisionBackend", side_effect=RuntimeError("API error")):
+            result = _try_llm_vision(b"fake_image")
+        assert result == ""
