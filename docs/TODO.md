@@ -195,7 +195,10 @@ v1.0.0:
 
 ### T-13: PaddleOCR / EasyOCR バックエンド
 - [Issue #4] [担当: PRGちゃん] [推定: 2〜3日]
-- [ ] T-05 完了後の発展
-- [ ] `pip install pdf-split-autorenamer[paddle]` の extras 設定
-- [ ] モデルダウンロードの初回確認ダイアログ（GUI）
-- [ ] ベンチマーク T-09 に結果追加
+- [x] T-05 完了後の発展（OcrBackend 抽象クラス利用）
+- [x] `pip install pdf-split-autorenamer[paddle]` / `[easyocr]` / `[llm]` の extras 設定
+- [x] `PaddleOCRBackend.extract_text()` 実装（use_angle_cls=True, lang=japan）
+- [x] `EasyOCRBackend` 実装（Reader(["ja"]), tempfile 経由）
+- [x] 両バックエンドのテスト追加（685 tests, 100% coverage 維持）
+- [ ] モデルダウンロードの初回確認ダイアログ（GUI）（v1.0 持ち越し）
+- [ ] ベンチマーク T-09 に実測値追加（実機環境で実施予定）
