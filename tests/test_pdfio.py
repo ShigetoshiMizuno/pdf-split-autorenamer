@@ -293,10 +293,18 @@ class TestExtractTextPdftotext:
         result = extract_text_pdftotext(pdf_path, pdftotext="fake_pdftotext_exe")
         assert result == ""
 
+    def test_finally_unlink_exception_is_swallowed(self, tmp_path):
+        """finally 内で unlink が失敗しても例外が外に漏れない（lines 126-127）"""
+        pdf_path = tmp_path / "nonexistent.pdf"
+        with patch("pathlib.Path.unlink", side_effect=PermissionError("locked")):
+            # shutil.copy2 が失敗して except で "" が返るが finally の unlink も失敗する
+            result = extract_text_pdftotext(pdf_path, pdftotext="fake_pdftotext_exe")
+        assert result == ""
+
 
 class TestExtractTextTesseract:
     def test_tessdata_warning_returns_empty(self):
-        """stderr に tessdata が含まれる場合 logging.warning を出して '' を返す（lines 73-74）"""
+        """stderr に tessdata が含まれる場合 logging.warning を出して '' を返す（lines 68-72）"""
         mock_result = MagicMock()
         mock_result.stdout = b""
         mock_result.stderr = b"Error, could not initialize tessdata"
@@ -304,6 +312,16 @@ class TestExtractTextTesseract:
             with patch("subprocess.run", return_value=mock_result):
                 result = extract_text_tesseract(b"fake image bytes")
         assert result == ""
+
+    def test_success_returns_decoded_stdout(self):
+        """正常に実行された場合 stdout を decode して返す（line 73）"""
+        mock_result = MagicMock()
+        mock_result.stdout = "認識テキスト\n".encode("utf-8")
+        mock_result.stderr = b""  # tessdata 警告なし
+        with patch("pdf_split_autorenamer.pdfio.find_tesseract", return_value="/fake/tesseract"):
+            with patch("subprocess.run", return_value=mock_result):
+                result = extract_text_tesseract(b"fake image bytes")
+        assert "認識テキスト" in result
 
     def test_subprocess_exception_returns_empty(self):
         """subprocess.run が例外を投げた場合 '' を返す（lines 74-75）"""

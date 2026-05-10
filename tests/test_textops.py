@@ -9,6 +9,8 @@
 - sanitize_filename
 """
 from __future__ import annotations
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -18,6 +20,8 @@ from pdf_split_autorenamer.textops import (
     extract_kind,
     fix_broken_unicode,
     fix_mojibake,
+    load_mojibake_map,
+    load_profile,
     sanitize_filename,
 )
 
@@ -274,3 +278,27 @@ class TestSanitizeFilename:
         """連続する空白は 1つの _ になる"""
         result = sanitize_filename("a   b")
         assert result == "a_b"
+
+
+# ---------------------------------------------------------------------------
+# load_profile / load_mojibake_map — tomllib=None の ImportError
+# ---------------------------------------------------------------------------
+
+class TestLoadProfileTomllibNone:
+    def test_raises_import_error_when_tomllib_none(self, tmp_path):
+        """tomllib が None のとき ImportError を送出する（line 191）"""
+        dummy = tmp_path / "dummy.toml"
+        dummy.write_bytes(b"")
+        with patch("pdf_split_autorenamer.textops.tomllib", None):
+            with pytest.raises(ImportError, match="TOML"):
+                load_profile(dummy)
+
+
+class TestLoadMojibakeMapTomllibNone:
+    def test_raises_import_error_when_tomllib_none(self, tmp_path):
+        """tomllib が None のとき ImportError を送出する（line 218）"""
+        dummy = tmp_path / "dummy.toml"
+        dummy.write_bytes(b"")
+        with patch("pdf_split_autorenamer.textops.tomllib", None):
+            with pytest.raises(ImportError, match="TOML"):
+                load_mojibake_map(dummy)
