@@ -66,7 +66,7 @@ def fallback_title(hint_filename: str) -> str:
     if not name:
         return ""
     name = re.sub(r"\d{4}-\d{1,2}-\d{1,2}_?", "", name)
-    name = re.sub(r"[�-ÿ]", "", name)  # U+FFFD と Latin-1 残骸を除去
+    name = re.sub(r"[�-ÿ]", "", name)  # U+FFFD と Latin-1 残骸を除去
     name = name.strip("_ ")
     return name[:30]
 

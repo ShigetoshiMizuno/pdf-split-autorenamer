@@ -29,12 +29,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
 build = ["pyinstaller>=6.0"]
 
 [project.urls]
 Homepage = "https://github.com/ShigetoshiMizuno/pdf-split-autorenamer"
 Issues = "https://github.com/ShigetoshiMizuno/pdf-split-autorenamer/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [project.scripts]
 psar = "pdf_split_autorenamer.cli:main"
