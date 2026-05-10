@@ -502,11 +502,11 @@ class TestGetVersion:
         assert len(result) > 0
 
     def test_fallback_when_importlib_raises(self):
-        """importlib.metadata.version が例外を起こしたとき '0.2.0' を返す（lines 133-134）"""
+        """importlib.metadata.version が例外を起こしたとき '0.3.0' を返す（lines 133-134）"""
         from pdf_split_autorenamer.cli import _get_version
         with patch("importlib.metadata.version", side_effect=Exception("not found")):
             result = _get_version()
-        assert result == "0.2.0"
+        assert result == "0.3.0"
 
 
 class TestStdoutReconfigure:
