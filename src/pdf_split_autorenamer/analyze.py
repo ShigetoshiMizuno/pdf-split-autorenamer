@@ -213,6 +213,64 @@ def build_initial_groups(pages: list[dict],
     return groups
 
 
+def generate_candidate_names(
+    pages: list[dict],
+    groups: dict[str, list[dict]],
+    *,
+    profile_patterns: tuple | None = None,
+) -> dict[str, list[dict]]:
+    """各グループの先頭ページから候補ファイル名を生成し、name フィールドに埋める。
+
+    書類サマリー = カテゴリ[-取引先][-文書番号] の追加方式で組み立てる。
+    build_initial_groups は触らず、groups に in-place で name を書き込む。
+    """
+    # ページを (pdf, page番号) でインデックス
+    page_index: dict[tuple[str, int], dict] = {
+        (p["pdf"], p["page"]): p for p in pages
+    }
+
+    if profile_patterns is not None:
+        title_patterns, body_patterns = profile_patterns
+    else:
+        title_patterns = None
+        body_patterns = None
+
+    for pdf, grp_list in groups.items():
+        for grp in grp_list:
+            start_page = grp["range"][0]
+            page = page_index.get((pdf, start_page))
+            text = page["text"] if page else ""
+
+            # 日付抽出
+            date = textops.date_from_string(text)
+            if not date:
+                candidates = textops.extract_dates_all(text)
+                date = candidates[0] if candidates else None
+
+            # カテゴリ
+            kind = textops.extract_kind(
+                text,
+                title_patterns=title_patterns,
+                body_patterns=body_patterns,
+            )
+
+            # 取引先・文書番号
+            vendor = textops.extract_vendor(text)
+            docno = textops.extract_doc_number(text)
+
+            # サマリー組み立て（追加方式）
+            summary = kind
+            if vendor:
+                summary += "-" + vendor
+            if docno:
+                summary += "-" + docno
+
+            name = f"{date or '日付不明'}_{summary}"
+            grp["name"] = textops.sanitize_filename(name, max_length=80)
+
+    return groups
+
+
 def build_boundary_info(pages: list[dict]) -> list[dict]:
     info: list[dict] = []
     for i in range(1, len(pages)):
