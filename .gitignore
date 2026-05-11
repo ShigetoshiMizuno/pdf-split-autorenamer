@@ -83,3 +83,9 @@ _*.py
 !**/__main__.py
 # ベンチマーク結果（生成ファイル）
 tests/fixtures/benchmark/results*.json
+
+# --- handover / raw_logs ---
+# 完了済みハンドオーバー（リネーム後の .done.md は無視）
+handover/*.done.md
+# 一次資料ログ（個人的なやり取り記録）
+raw_logs/
