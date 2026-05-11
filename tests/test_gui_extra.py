@@ -508,6 +508,51 @@ class TestOnRenameExtra:
 
 
 # ---------------------------------------------------------------------------
+# _toggle_split_advanced / _toggle_rename_advanced  (lines 234-245)
+# ---------------------------------------------------------------------------
+
+class TestToggleAdvanced:
+    def _make_app_with_advanced(self, split_checked: bool, rename_checked: bool) -> object:
+        app = _make_app()
+        app.__dict__["_split_advanced_var"] = _BooleanVar(split_checked)
+        app.__dict__["_rename_advanced_var"] = _BooleanVar(rename_checked)
+        split_frame = MagicMock()
+        split_frame.master.winfo_children.return_value = [MagicMock(), MagicMock()]
+        rename_frame = MagicMock()
+        app.__dict__["_split_advanced_frame"] = split_frame
+        app.__dict__["_rename_advanced_frame"] = rename_frame
+        return app
+
+    def test_toggle_split_advanced_pack_when_checked(self):
+        """split_advanced_var=True → pack が呼ばれる"""
+        app = self._make_app_with_advanced(split_checked=True, rename_checked=False)
+        app._toggle_split_advanced()
+        app._split_advanced_frame.pack.assert_called_once()
+        app._split_advanced_frame.pack_forget.assert_not_called()
+
+    def test_toggle_split_advanced_pack_forget_when_unchecked(self):
+        """split_advanced_var=False → pack_forget が呼ばれる"""
+        app = self._make_app_with_advanced(split_checked=False, rename_checked=False)
+        app._toggle_split_advanced()
+        app._split_advanced_frame.pack_forget.assert_called_once()
+        app._split_advanced_frame.pack.assert_not_called()
+
+    def test_toggle_rename_advanced_pack_when_checked(self):
+        """rename_advanced_var=True → pack が呼ばれる"""
+        app = self._make_app_with_advanced(split_checked=False, rename_checked=True)
+        app._toggle_rename_advanced()
+        app._rename_advanced_frame.pack.assert_called_once()
+        app._rename_advanced_frame.pack_forget.assert_not_called()
+
+    def test_toggle_rename_advanced_pack_forget_when_unchecked(self):
+        """rename_advanced_var=False → pack_forget が呼ばれる"""
+        app = self._make_app_with_advanced(split_checked=False, rename_checked=False)
+        app._toggle_rename_advanced()
+        app._rename_advanced_frame.pack_forget.assert_called_once()
+        app._rename_advanced_frame.pack.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # main (lines 369-371) + __main__ guard (line 375)
 # ---------------------------------------------------------------------------
 
