@@ -1,4 +1,4 @@
-# 教会書類用プロファイル（デフォルト設定と同等）
+# 教会向け（旧デフォルト・v0.4 から church.toml としてオプトイン）
 name = "church"
 
 [[title_patterns]]
