@@ -169,36 +169,35 @@ class TestExtractDatesAll:
 # ---------------------------------------------------------------------------
 
 class TestExtractKind:
-    def test_body_contains_sunday_message(self):
-        """本文に '主日礼拝メッセージ要旨' が含まれれば 'ub0bb日礼拝メッセージ要旨' を返す"""
-        text = "この文書は\n主日礼拝メッセージ要旨\nテキスト"
-        assert extract_kind(text) == "主日礼拝メッセージ要旨"
+    def test_body_contains_invoice(self):
+        """本文に '請求' が含まれれば '請求書' を返す"""
+        text = "この文書は\n請求書\nテキスト"
+        assert extract_kind(text) == "請求書"
 
-    def test_head_contains_weekly_bulletin(self):
-        """先頭行に '週報' が含まれれば '週報' を返す"""
-        text = "週報\n2026年4月6日"
-        assert extract_kind(text) == "週報"
+    def test_head_contains_minutes(self):
+        """先頭行に '議事録' が含まれれば '議事録' を返す"""
+        text = "議事録\n2026年4月6日"
+        assert extract_kind(text) == "議事録"
 
     def test_no_match_returns_default(self):
         """何もマッチしなければデフォルト '書類' を返す"""
         text = "ランダムなテキストです"
         assert extract_kind(text) == "書類"
 
-    def test_ocr_kankei_judged_as_weekly(self):
-        """OCR化け '歓迁' → 歓迎パターンが '週報' に判定される"""
-        # 歓迁 は MOJIBAKE_FIX で歓迎になり、週報パターンにマッチする
-        text = "歓迁礼拝\nお知らせ"
-        assert extract_kind(text) == "週報"
+    def test_notice_pattern_matched(self):
+        """'お知らせ' が含まれれば '通知書' を返す"""
+        text = "お知らせ\n詳細内容"
+        assert extract_kind(text) == "通知書"
 
     def test_custom_default_kind(self):
         """デフォルト種別をカスタマイズできる"""
         text = "ランダムなテキスト"
         assert extract_kind(text, default_kind="不明") == "不明"
 
-    def test_sunday_message_in_head(self):
-        """先頭行に '主日礼拝メッセージ要旨' があれば正しく判定される"""
-        text = "主日礼拝メッセージ要旨\n2026年4月6日"
-        assert extract_kind(text) == "主日礼拝メッセージ要旨"
+    def test_estimate_in_head(self):
+        """先頭行に '見積書' があれば正しく判定される"""
+        text = "見積書\n2026年4月6日"
+        assert extract_kind(text) == "見積書"
 
     def test_empty_string_returns_default(self):
         """空文字列はデフォルト種別を返す"""
