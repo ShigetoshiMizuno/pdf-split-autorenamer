@@ -247,3 +247,56 @@ class TestExtractDocNumber:
     def test_spaces_only_returns_none(self):
         """空白のみは None（S-3 異常系）"""
         assert extract_doc_number("   ") is None
+
+
+class TestExtractVendorBugFixes:
+    """W-1/W-2 バグ修正テスト（QA Round 2）"""
+
+    def test_no_date_in_vendor_result(self):
+        """W-1: 後置会社形態パターンが改行をまたいで日付を社名と誤認しないこと。
+        "2026年5月1日\\n株式会社デジタルパートナーズ" のとき、
+        戻り値に日付文字列が含まれないこと（理想: "デジタルパートナーズ" のみ）"""
+        text = "2026年5月1日\n株式会社デジタルパートナーズ\n代表取締役 高橋 花子"
+        result = extract_vendor(text)
+        # 日付由来の文字列が混入しないこと
+        assert result is not None
+        assert "2026" not in result
+        assert "年" not in result
+        assert "月" not in result
+        assert "日" not in result
+        assert "デジタルパートナーズ" in result
+
+    def test_no_department_role_in_vendor_result(self):
+        """W-2: 前置会社形態パターンが部署/役職/担当者名まで含めないこと。
+        "株式会社 関西商会　購買部 部長 山本様" のとき、
+        戻り値が "関西商会" のみで部署・役職・個人名を含まないこと"""
+        text = "株式会社 関西商会　購買部 部長 山本様"
+        result = extract_vendor(text)
+        assert result is not None
+        assert result == "関西商会"
+        # 部署・役職・個人名が含まれないこと
+        assert "購買部" not in result
+        assert "部長" not in result
+        assert "山本" not in result
+
+    def test_vendor_with_full_width_space_between_dept(self):
+        """W-2 全角空白対応: 全角空白で区切られた部署/役職が混入しないこと。
+        "合同会社テック商会　営業部 担当 鈴木様" のとき戻り値が "テック商会" のみ"""
+        text = "合同会社テック商会　営業部 担当 鈴木様"
+        result = extract_vendor(text)
+        assert result is not None
+        assert result == "テック商会"
+        assert "営業部" not in result
+        assert "担当" not in result
+        assert "鈴木" not in result
+
+    def test_date_filter_returns_none_when_only_date(self):
+        """W-1 追加防衛: 抽出結果が日付パターンのみになる場合は None を返すこと"""
+        # 日付だけが残ってしまうようなテキスト
+        text = "2026年5月1日\n合同会社\n詳細本文"
+        result = extract_vendor(text)
+        # 戻り値が None か、日付パターンを含まないこと
+        if result is not None:
+            assert "2026" not in result
+            import re
+            assert not re.search(r"\d{4}[年/\-]\d{1,2}", result)
