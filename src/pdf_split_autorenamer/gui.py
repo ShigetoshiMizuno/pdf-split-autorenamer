@@ -70,10 +70,15 @@ class App(tk.Tk):
         f1 = ttk.LabelFrame(body, text="1. 解析（サムネ・HTMLレポート生成）", padding=8)
         f1.pack(fill="x", **pad)
         ttk.Button(f1, text="解析を実行", command=self._on_analyze).pack(side="left")
-        ttk.Button(f1, text="report.html をブラウザで開く",
-                   command=self._on_open_report).pack(side="left", padx=8)
-        ttk.Label(f1, text="HTMLで境界・出力名を編集 → groups.json を上書き保存").pack(
-            side="left", padx=12)
+        # アプリ内編集（pywebview があれば優先表示）
+        from . import inapp_editor as _inapp
+        inapp_btn_text = "アプリ内で編集（推奨）" if _inapp.is_available() else "アプリ内で編集（要 pywebview）"
+        inapp_btn = ttk.Button(f1, text=inapp_btn_text, command=self._on_inapp_edit)
+        inapp_btn.pack(side="left", padx=8)
+        if not _inapp.is_available():
+            inapp_btn.state(["disabled"])
+        ttk.Button(f1, text="ブラウザで開く（フォールバック）",
+                   command=self._on_open_report).pack(side="left", padx=4)
 
         # Step 2: 分割
         f2 = ttk.LabelFrame(body, text="2. 分割（groups.json に従って）", padding=8)
@@ -250,6 +255,60 @@ class App(tk.Tk):
             messagebox.showwarning("警告", f"レポートが未生成です。先に「解析を実行」を押してください。\n{html}")
             return
         webbrowser.open(html.as_uri())
+
+    def _on_inapp_edit(self) -> None:
+        """pywebview を別プロセスで起動してアプリ内編集 UI を表示する。
+
+        Tk のメインループと pywebview の GUI ループが衝突するのを避けるため、
+        別プロセスで `python -m pdf_split_autorenamer.inapp_editor <work_dir>` を呼ぶ。
+        """
+        from . import inapp_editor as _inapp
+
+        if not _inapp.is_available():
+            messagebox.showwarning(
+                "pywebview 未導入",
+                "アプリ内編集には pywebview が必要です。\n\n"
+                "  pip install 'pdf-split-autorenamer[gui-inapp]'\n\n"
+                "を実行してから GUI を再起動してください。"
+            )
+            return
+
+        folder = self._get_folder()
+        if not folder:
+            return
+        work_dir = folder / ".psar"
+        html = work_dir / "report.html"
+        if not html.exists():
+            messagebox.showwarning(
+                "警告",
+                f"レポートが未生成です。先に「解析を実行」を押してください。\n{html}"
+            )
+            return
+
+        self._log("=== アプリ内編集 UI を起動中… ===")
+        self._set_status("アプリ内編集ウィンドウを開いています…")
+
+        import subprocess
+
+        def runner():
+            try:
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "pdf_split_autorenamer.inapp_editor", str(work_dir)],
+                )
+                proc.wait()
+                return proc.returncode
+            except Exception as e:  # noqa: BLE001
+                return f"起動失敗: {e}"
+
+        def done(result):
+            if isinstance(result, int) and result == 0:
+                self._log("=== アプリ内編集 UI を閉じました ===")
+                self._set_status("編集完了。続けて「分割 実行」を押せます")
+            else:
+                self._log(f"=== アプリ内編集 UI 異常終了: {result} ===")
+                self._set_status("編集 UI でエラー")
+
+        self._run_async(runner, done)
 
     def _on_split(self, apply_: bool) -> None:
         folder = self._get_folder()
