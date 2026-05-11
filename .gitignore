@@ -65,6 +65,9 @@ examples/sample_pdfs/
 sample_pdfs/
 test_pdfs/
 *.pdf
+# ただし docs/demo/ 配下の合成デモ PDF は README.html / GitHub Pages から
+# 配布するため例外的に含める（個人情報なし、scripts/generate_demo_pdf.py で再生成可）
+!docs/demo/*.pdf
 
 # --- IDE / OS ---
 .vscode/

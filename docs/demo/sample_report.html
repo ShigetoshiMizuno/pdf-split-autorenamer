@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>PDF 分割レビュー</title>
+<style>
+:root{ --bg:#fafafa; --fg:#222; --muted:#666; --line:#ddd; --on:#d33; --off:#888; --gbg:#fff8e8; }
+body{ font-family: "Segoe UI", "Yu Gothic UI", sans-serif; margin:0; padding:0; background:var(--bg); color:var(--fg);}
+header{ position:sticky; top:0; background:#fff; border-bottom:1px solid var(--line); padding:10px 16px; z-index:10; display:flex; gap:14px; align-items:center; flex-wrap:wrap;}
+header h1{ font-size:14px; margin:0; }
+header button{ font-size:13px; padding:6px 12px; cursor:pointer; }
+.stat{ font-size:12px; color:var(--muted); }
+main{ max-width:1100px; margin:0 auto; padding:16px;}
+.pdf-section{ margin-bottom:32px; }
+.pdf-title{ font-size:13px; color:var(--muted); padding:8px 0; border-bottom:1px solid var(--line); margin-bottom:8px;}
+.row{ display:flex; gap:12px; align-items:flex-start; padding:8px; background:#fff; border:1px solid var(--line); border-radius:4px; margin-bottom:4px;}
+.row.first-of-group{ border-top:3px solid var(--on); background:var(--gbg);}
+.row .thumb{ width:220px; flex-shrink:0; }
+.row .thumb img{ width:100%; border:1px solid #bbb; display:block;}
+.row .meta{ flex:1; min-width:0; }
+.row .meta .top{ display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+.row .meta .pgno{ font-weight:bold; font-size:13px; min-width:40px;}
+.row .meta .grp{ display:inline-block; padding:2px 8px; background:#eef; border:1px solid #99c; border-radius:3px; font-size:12px;}
+.row .meta .info{ color:var(--muted); font-size:11px; margin-top:4px;}
+.row .meta pre{ font-size:11px; background:#f6f6f6; padding:6px; border-radius:3px; max-height:80px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:6px 0 0 0;}
+.btns{ display:inline-flex; gap:4px; margin-left:auto;}
+.btns button{ font-size:12px; padding:4px 10px; cursor:pointer; border:1px solid var(--line); background:#fff; border-radius:3px;}
+.btns button.cut.active{ background:var(--on); color:#fff; border-color:var(--on);}
+.btns button.join.active{ background:#cef; border-color:#39c; color:#06a;}
+.btns button[disabled]{ background:#f0f0f0; color:#bbb; cursor:not-allowed;}
+.namebox{ display:flex; gap:6px; align-items:center; margin-top:6px;}
+.namebox label{ font-size:11px; color:var(--muted);}
+.namebox input{ flex:1; font-size:13px; padding:4px 6px; border:1px solid #99c; border-radius:3px; min-width:0;}
+.preview{ font-size:11px; color:#06a; margin-top:2px;}
+.ocr-empty{ background:#fff3cd; border:1px solid #ffc107; color:#856404; font-size:11px; padding:3px 6px; border-radius:3px; margin-top:4px; display:inline-block;}
+</style>
+</head>
+<body>
+<header>
+  <h1>PDF 分割レビュー</h1>
+  <div class="stat" id="stat"></div>
+  <button onclick="saveJson()">groups.json を保存</button>
+  <button onclick="resetGroups()">初期境界に戻す</button>
+</header>
+<main id="main"></main>
+<script id="payload" type="application/json">eyJwYWdlcyI6IFt7InBkZiI6ICJzYW1wbGVfb2ZmaWNlX3NjYW4ucGRmIiwgInBhZ2UiOiAxLCAidGh1bWIiOiAidGh1bWJzL3NhbXBsZV9vZmZpY2Vfc2Nhbl9wMDAxLmpwZyIsICJvcmllbnQiOiAiUCIsICJzaXplIjogIjU5NXg4NDIiLCAiaGVhZCI6ICLoq4vmsYLmm7ggICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgTm8uIDIwMjbigJIwNDAx4oCSMDAxXG7nmbrvqIjml6U6IDIwMjbvpo405pyIMeaXpVxu5qCq5byP5Lya56S+IOWxseeUsOW3pealrSDlvqHkuK0ifSwgeyJwZGYiOiAic2FtcGxlX29mZmljZV9zY2FuLnBkZiIsICJwYWdlIjogMiwgInRodW1iIjogInRodW1icy9zYW1wbGVfb2ZmaWNlX3NjYW5fcDAwMi5qcGciLCAib3JpZW50IjogIlAiLCAic2l6ZSI6ICI1OTV4ODQyIiwgImhlYWQiOiAi5b6h76iK56mN5pu4ICAgICAgICAgICAgICAgICAgICAgICAgICAgIO+oiuepjeeVquWPtzogUeKAkjIwMjbigJIwNDA4XG4yMDI276aONOaciDjml6Vcbu+mseacqOW7uuioreagquW8j+S8muekviDlvqHkuK0ifSwgeyJwZGYiOiAic2FtcGxlX29mZmljZV9zY2FuLnBkZiIsICJwYWdlIjogMywgInRodW1iIjogInRodW1icy9zYW1wbGVfb2ZmaWNlX3NjYW5fcDAwMy5qcGciLCAib3JpZW50IjogIlAiLCAic2l6ZSI6ICI1OTV4ODQyIiwgImhlYWQiOiAi5Za25qWt6YOoIOWumu+mteS8muitsCDorbDkuovpjLJcbuaXpeaZgjogMjAyNu+mjjTmnIgxNeaXpe+8iOawtO+8iTEwOjAw772eMTE6MzBcbuWgtOaJgDog5pys56S+IDNGIOS8muitsOWupEEifSwgeyJwZGYiOiAic2FtcGxlX29mZmljZV9zY2FuLnBkZiIsICJwYWdlIjogNCwgInRodW1iIjogInRodW1icy9zYW1wbGVfb2ZmaWNlX3NjYW5fcDAwNC5qcGciLCAib3JpZW50IjogIlAiLCAic2l6ZSI6ICI1OTV4ODQyIiwgImhlYWQiOiAi5Za25qWt6YOoIOWumu+mteS8muitsCDorbDkuovpjLLvvIgyLzLvvIlcbjQuIOaxuuWumuS6i+mghVxuICDjg7vlsZXnpLrkvJrlh7rlsZXjg6Hjg7Pjg5Djg7w6IOS9kOiXpOOAgeeUsOS4reOAgemrmOapiyJ9LCB7InBkZiI6ICJzYW1wbGVfb2ZmaWNlX3NjYW4ucGRmIiwgInBhZ2UiOiA1LCAidGh1bWIiOiAidGh1bWJzL3NhbXBsZV9vZmZpY2Vfc2Nhbl9wMDA1LmpwZyIsICJvcmllbnQiOiAiUCIsICJzaXplIjogIjU5NXg4NDIiLCAiaGVhZCI6ICLnqJ/orbDmm7ggICAgICAgICAgICAgICAgICAgICAgICAgICAgIOeon+itsOeVquWPtzogUuKAkjIwMjbigJIwMThcbui1t+ahiOaXpTogMjAyNu+mjjTmnIgyMOaXpVxu6LW35qGI6ICFOiDnt4/li5npg6gg5rih6L66IOasoe+krCJ9LCB7InBkZiI6ICJzYW1wbGVfb2ZmaWNlX3NjYW4ucGRmIiwgInBhZ2UiOiA2LCAidGh1bWIiOiAidGh1bWJzL3NhbXBsZV9vZmZpY2Vfc2Nhbl9wMDA2LmpwZyIsICJvcmllbnQiOiAiUCIsICJzaXplIjogIjU5NXg4NDIiLCAiaGVhZCI6ICLlh7rlvLXloLHlkYrmm7hcbuaPkOWHuuaXpTogMjAyNu+mjjTmnIgyMuaXpVxu5rCP5ZCNOiDllrbmpa3pg6gg55Sw5LitIOS4gO+krCJ9LCB7InBkZiI6ICJzYW1wbGVfb2ZmaWNlX3NjYW4ucGRmIiwgInBhZ2UiOiA3LCAidGh1bWIiOiAidGh1bWJzL3NhbXBsZV9vZmZpY2Vfc2Nhbl9wMDA3LmpwZyIsICJvcmllbnQiOiAiUCIsICJzaXplIjogIjU5NXg4NDIiLCAiaGVhZCI6ICLnmbrms6jmm7ggICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOeZuuazqOeVquWPtzogUE/igJIyMDI24oCSMDQyNVxu55m676iI5pelOiAyMDI276aONOaciDI15pelXG7moKrlvI/kvJrnpL4g44Kq44OV44Kj44K544K144OX44Op44KkIOW+oeS4rSJ9LCB7InBkZiI6ICJzYW1wbGVfb2ZmaWNlX3NjYW4ucGRmIiwgInBhZ2UiOiA4LCAidGh1bWIiOiAidGh1bWJzL3NhbXBsZV9vZmZpY2Vfc2Nhbl9wMDA4LmpwZyIsICJvcmllbnQiOiAiUCIsICJzaXplIjogIjU5NXg4NDIiLCAiaGVhZCI6ICLvprTlj47mm7hcbjIwMjbvpo405pyIMjjml6VcbuagquW8j+S8muekviDjgrXjg7Pjg5fjg6vllYbkuosg5qeYIn0sIHsicGRmIjogInNhbXBsZV9vZmZpY2Vfc2Nhbi5wZGYiLCAicGFnZSI6IDksICJ0aHVtYiI6ICJ0aHVtYnMvc2FtcGxlX29mZmljZV9zY2FuX3AwMDkuanBnIiwgIm9yaWVudCI6ICJQIiwgInNpemUiOiAiNTk1eDg0MiIsICJoZWFkIjogIualreWLmeWnlOiol+Wlkee0hOabuFxuMjAyNu+mjjXmnIgx5pelXG7moKrlvI/kvJrnpL4g44K144Oz44OX44Or5ZWG5LqL77yI5Lul5LiL44CM55Sy44CN44Go44GE44GG77yJ44GoIn0sIHsicGRmIjogInNhbXBsZV9vZmZpY2Vfc2Nhbi5wZGYiLCAicGFnZSI6IDEwLCAidGh1bWIiOiAidGh1bWJzL3NhbXBsZV9vZmZpY2Vfc2Nhbl9wMDEwLmpwZyIsICJvcmllbnQiOiAiUCIsICJzaXplIjogIjU5NXg4NDIiLCAiaGVhZCI6ICLmpa3li5nlp5ToqJflpZHntITmm7jvvIgyLzLvvIlcbuesrDbmnaHvvIjop6PpmaTvvIlcbiAg55Sy44G+44Gf44Gv5LmZ44GM5pys5aWR57SE44Gr6YGV5Y+N44GX44CB55u45b2T44Gu5YKs5ZGK44KS57WM44Gm44KC5piv5q2j44GV44KM44Gq44GEIn1dLCAiYm91bmRhcmllcyI6IFt7InNjb3JlIjogMC41LCAicmVhc29ucyI6IFsi5paw44K/44Kk44OI44OrIDTmnIg45pelIl0sICJjcm9zc19wZGYiOiBmYWxzZX0sIHsic2NvcmUiOiAwLjksICJyZWFzb25zIjogWyLjg4bjgq3jgrnjg4jpoZ7kvLzmpbXkvY4gKDAuMDQpIiwgIuaWsOOCv+OCpOODiOODqyA05pyIMTXml6UiXSwgImNyb3NzX3BkZiI6IGZhbHNlfSwgeyJzY29yZSI6IDAuMCwgInJlYXNvbnMiOiBbIumhnuS8vCAoaj0wLjE5KSJdLCAiY3Jvc3NfcGRmIjogZmFsc2V9LCB7InNjb3JlIjogMC45LCAicmVhc29ucyI6IFsi44OG44Kt44K544OI6aGe5Ly85qW15L2OICgwLjA1KSIsICLmlrDjgr/jgqTjg4jjg6sgNOaciDIw5pelIl0sICJjcm9zc19wZGYiOiBmYWxzZX0sIHsic2NvcmUiOiAwLjcsICJyZWFzb25zIjogWyLjg4bjgq3jgrnjg4jpoZ7kvLzkvY4gKDAuMDcpIiwgIuaWsOOCv+OCpOODiOODqyA05pyIMjLml6UiXSwgImNyb3NzX3BkZiI6IGZhbHNlfSwgeyJzY29yZSI6IDAuNywgInJlYXNvbnMiOiBbIuODhuOCreOCueODiOmhnuS8vOS9jiAoMC4wOCkiLCAi5paw44K/44Kk44OI44OrIDTmnIgyNeaXpSJdLCAiY3Jvc3NfcGRmIjogZmFsc2V9LCB7InNjb3JlIjogMC41LCAicmVhc29ucyI6IFsi5paw44K/44Kk44OI44OrIDTmnIgyOOaXpSJdLCAiY3Jvc3NfcGRmIjogZmFsc2V9LCB7InNjb3JlIjogMC43LCAicmVhc29ucyI6IFsi44OG44Kt44K544OI6aGe5Ly85L2OICgwLjA1KSIsICLmlrDjgr/jgqTjg4jjg6sgNeaciDHml6UiXSwgImNyb3NzX3BkZiI6IGZhbHNlfSwgeyJzY29yZSI6IDAuMCwgInJlYXNvbnMiOiBbIumhnuS8vCAoaj0wLjE0KSJdLCAiY3Jvc3NfcGRmIjogZmFsc2V9XSwgImluaXRpYWxfZ3JvdXBzIjogeyJzYW1wbGVfb2ZmaWNlX3NjYW4ucGRmIjogW3sicmFuZ2UiOiBbMSwgMV0sICJuYW1lIjogIiJ9LCB7InJhbmdlIjogWzIsIDJdLCAibmFtZSI6ICIifSwgeyJyYW5nZSI6IFszLCA0XSwgIm5hbWUiOiAiIn0sIHsicmFuZ2UiOiBbNSwgNV0sICJuYW1lIjogIiJ9LCB7InJhbmdlIjogWzYsIDZdLCAibmFtZSI6ICIifSwgeyJyYW5nZSI6IFs3LCA3XSwgIm5hbWUiOiAiIn0sIHsicmFuZ2UiOiBbOCwgOF0sICJuYW1lIjogIiJ9LCB7InJhbmdlIjogWzksIDEwXSwgIm5hbWUiOiAiIn1dfX0=</script>
+<script>
+const payload = JSON.parse(atob(document.getElementById('payload').textContent.trim()));
+const pages = payload.pages;
+const boundaries = payload.boundaries;
+const initial = payload.initial_groups;
+
+function buildInitialFlags() {
+  const flags = new Array(pages.length - 1).fill(false);
+  const groupOfPage = new Map();
+  for (const [pdfName, groups] of Object.entries(initial)) {
+    groups.forEach((g, gi) => {
+      const r = g.range || g;
+      for (let p = r[0]; p <= r[1]; p++) groupOfPage.set(pdfName + "|" + p, gi);
+    });
+  }
+  for (let i = 1; i < pages.length; i++) {
+    const a = pages[i-1], b = pages[i];
+    if (a.pdf !== b.pdf) { flags[i-1] = true; continue; }
+    const ga = groupOfPage.get(a.pdf + "|" + a.page);
+    const gb = groupOfPage.get(b.pdf + "|" + b.page);
+    if (ga !== gb) flags[i-1] = true;
+  }
+  return flags;
+}
+function buildInitialNames() {
+  const names = new Map();
+  for (const [pdfName, groups] of Object.entries(initial)) {
+    for (const g of groups) {
+      const r = g.range || g;
+      names.set(pdfName + "|" + r[0], g.name || "");
+    }
+  }
+  return names;
+}
+let flags = buildInitialFlags();
+let names = buildInitialNames();
+function isFirstOfGroup(i) {
+  if (i === 0) return true;
+  if (pages[i].pdf !== pages[i-1].pdf) return true;
+  return flags[i-1];
+}
+function previewFileName(pdfName, firstPage, groupIdx, name) {
+  const stem = pdfName.replace(/\.pdf$/i, '');
+  const nn = String(groupIdx).padStart(2, '0');
+  const safe = (name || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
+  return safe ? `→ ${stem}_${nn}_${safe}.pdf` : `→ ${stem}_${nn}.pdf`;
+}
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+function render() {
+  const main = document.getElementById('main');
+  main.innerHTML = "";
+  let curPdf = null, sec = null;
+  let groupIdxByPdf = {};
+  const groupNum = new Array(pages.length).fill(1);
+  for (let i = 0; i < pages.length; i++) {
+    if (i === 0 || pages[i].pdf !== pages[i-1].pdf) groupIdxByPdf[pages[i].pdf] = 1;
+    else if (flags[i-1]) groupIdxByPdf[pages[i].pdf] = (groupIdxByPdf[pages[i].pdf]||1) + 1;
+    groupNum[i] = groupIdxByPdf[pages[i].pdf];
+  }
+  for (let i = 0; i < pages.length; i++) {
+    const p = pages[i];
+    if (p.pdf !== curPdf) {
+      curPdf = p.pdf;
+      sec = document.createElement('section');
+      sec.className = 'pdf-section';
+      const title = document.createElement('div');
+      title.className = 'pdf-title';
+      title.textContent = curPdf;
+      sec.appendChild(title);
+      main.appendChild(sec);
+    }
+    const isFirst = isFirstOfGroup(i);
+    const samePdfAsPrev = i > 0 && pages[i-1].pdf === p.pdf;
+    const bi = samePdfAsPrev ? boundaries[i-1] : null;
+    const reasons = bi ? `score=${bi.score} ${bi.reasons.join(' / ')}` : '';
+    const row = document.createElement('div');
+    row.className = 'row' + (isFirst ? ' first-of-group' : '');
+    const thumb = document.createElement('div');
+    thumb.className = 'thumb';
+    const img = document.createElement('img');
+    img.src = p.thumb; img.loading = 'lazy';
+    thumb.appendChild(img);
+    row.appendChild(thumb);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const top = document.createElement('div');
+    top.className = 'top';
+    const pgno = document.createElement('span');
+    pgno.className = 'pgno'; pgno.textContent = `p${p.page}`;
+    top.appendChild(pgno);
+    const grp = document.createElement('span');
+    grp.className = 'grp'; grp.textContent = `グループ ${groupNum[i]}`;
+    top.appendChild(grp);
+    const btns = document.createElement('div');
+    btns.className = 'btns';
+    const joinBtn = document.createElement('button');
+    joinBtn.className = 'join' + (samePdfAsPrev && !flags[i-1] ? ' active' : '');
+    joinBtn.textContent = '↑ つなぐ';
+    const cutBtn = document.createElement('button');
+    cutBtn.className = 'cut' + ((!samePdfAsPrev || flags[i-1]) ? ' active' : '');
+    cutBtn.textContent = '↑ 切る';
+    if (i === 0 || !samePdfAsPrev) {
+      joinBtn.disabled = true; cutBtn.disabled = true;
+    } else {
+      joinBtn.onclick = () => { flags[i-1] = false; render(); };
+      cutBtn.onclick = () => { flags[i-1] = true; render(); };
+    }
+    btns.appendChild(joinBtn); btns.appendChild(cutBtn);
+    top.appendChild(btns);
+    meta.appendChild(top);
+    const info = document.createElement('div');
+    info.className = 'info';
+    info.textContent = `${p.size} / ${p.orient === 'P' ? '縦' : '横'}`;
+    if (reasons) info.textContent += `   |   ${reasons}`;
+    meta.appendChild(info);
+    if (isFirst) {
+      const nameKey = p.pdf + "|" + p.page;
+      const nameWrap = document.createElement('div');
+      nameWrap.className = 'namebox';
+      const lbl = document.createElement('label');
+      lbl.textContent = '出力名:';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = names.get(nameKey) || '';
+      input.placeholder = '例) 2026-04-06_主日礼拝';
+      input.oninput = (e) => {
+        names.set(nameKey, e.target.value);
+        const sib = nameWrap.nextElementSibling;
+        if (sib && sib.classList.contains('preview')) {
+          sib.textContent = previewFileName(p.pdf, p.page, groupNum[i], e.target.value);
+        }
+      };
+      nameWrap.appendChild(lbl); nameWrap.appendChild(input);
+      meta.appendChild(nameWrap);
+      const preview = document.createElement('div');
+      preview.className = 'preview';
+      preview.textContent = previewFileName(p.pdf, p.page, groupNum[i], input.value);
+      meta.appendChild(preview);
+    }
+    const pre = document.createElement('pre');
+    pre.textContent = p.head || '(テキストなし)';
+    meta.appendChild(pre);
+    if (!p.head || p.head.trim() === '') {
+      const warn = document.createElement('span');
+      warn.className = 'ocr-empty';
+      warn.textContent = '⚠ OCR テキスト空（Tesseract OCR を検討してください）';
+      meta.appendChild(warn);
+    }
+    row.appendChild(meta);
+    sec.appendChild(row);
+  }
+  const total = Object.values(groupIdxByPdf).reduce((a,b)=>a+b, 0);
+  document.getElementById('stat').textContent = `総ページ ${pages.length} / グループ合計 ${total}`;
+}
+function buildGroupsFromFlags() {
+  const out = {};
+  let curPdf = null;
+  let curStart = 0;
+  for (let i = 0; i < pages.length; i++) {
+    if (curPdf === null || pages[i].pdf !== curPdf) {
+      if (curPdf !== null) {
+        const r0 = pages[curStart].page, r1 = pages[i-1].page;
+        out[curPdf].push({range:[r0, r1], name: names.get(curPdf+"|"+r0) || ""});
+      }
+      curPdf = pages[i].pdf;
+      out[curPdf] = out[curPdf] || [];
+      curStart = i;
+      continue;
+    }
+    if (flags[i-1]) {
+      const r0 = pages[curStart].page, r1 = pages[i-1].page;
+      out[curPdf].push({range:[r0, r1], name: names.get(curPdf+"|"+r0) || ""});
+      curStart = i;
+    }
+  }
+  if (curPdf !== null) {
+    const r0 = pages[curStart].page, r1 = pages[pages.length-1].page;
+    out[curPdf].push({range:[r0, r1], name: names.get(curPdf+"|"+r0) || ""});
+  }
+  return out;
+}
+function saveJson() {
+  const data = buildGroupsFromFlags();
+  const jsonStr = JSON.stringify(data, null, 2);
+  if (window.location.protocol === 'http:') {
+    // psar serve モード: サーバーに直接保存
+    fetch('/api/save-groups', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: jsonStr
+    }).then(r => {
+      if (r.ok) {
+        alert('groups.json を保存しました。\n分割を実行するには psar split を実行してください。');
+      } else {
+        r.text().then(t => alert('保存失敗: ' + t));
+      }
+    }).catch(e => alert('保存失敗: ' + e));
+  } else {
+    // file:// プロトコル: 従来のダウンロード
+    const blob = new Blob([jsonStr], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'groups.json'; a.click();
+    URL.revokeObjectURL(url);
+    alert('groups.json をダウンロードしました。\n作業ディレクトリ (.psar) に上書き保存してから\n分割を実行してください。');
+  }
+}
+function resetGroups() {
+  if (!confirm('初期境界とファイル名を初期状態に戻します。よろしいですか?')) return;
+  flags = buildInitialFlags();
+  names = buildInitialNames();
+  render();
+}
+render();
+</script>
+</body>
+</html>

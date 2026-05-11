@@ -4,6 +4,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
+> 📖 **ビジュアル版（事務所向け紹介ページ）はこちら → [docs/index.html](docs/index.html)**
+> （GitHub Pages を有効化すれば `https://shigetoshimizuno.github.io/pdf-split-autorenamer/` で公開できます）
+>
+> 📥 **デモ素材**: [サンプル PDF（10ページ・8書類混在）](docs/demo/sample_office_scan.pdf) ／
+> [サンプル groups.json](docs/demo/sample_groups.json) ／
+> [サンプル report.html](docs/demo/sample_report.html)
+
 OCR テキストが埋め込まれたスキャンPDF群を、**書類ごとのグループに自動分割**し、
 **内容ベースで `YYYY-MM-DD_書類タイプ.pdf` に自動リネーム**するツールです。
 
