@@ -196,9 +196,29 @@ def run_rename(src_dir: Path, mode: str = "split", apply: bool = False,
 # textops.py（ユーティリティ）
 def extract_dates_all(text: str) -> list[str]
 def extract_kind(text, title_patterns, body_patterns, default_kind) -> str
+def extract_vendor(text: str, max_len: int = 20) -> str | None
+    # 文書先頭 10 行から取引先名を抽出。
+    # 「株式会社○○ 御中」「○○株式会社 様」「(株)○○」「○○ Inc.」等のパターンで検出。
+    # マッチなし → None。最大 max_len 文字でトリム。
+def extract_doc_number(text: str, max_len: int = 30) -> str | None
+    # 文書全体から文書番号を抽出（最初のマッチ）。
+    # 「No. XXX」「PO-XXX」「請求番号: XXX」「Q-XXX」等のパターンで検出。
+    # マッチなし → None。最大 max_len 文字でトリム。
 def fix_mojibake(s: str) -> str
 def fix_broken_unicode(s: str) -> str
 def sanitize_filename(name: str, max_length: int = 80) -> str
+
+# analyze.py（ユーティリティ）
+def generate_candidate_names(
+    pages: dict,
+    groups: dict,
+    *,
+    profile_patterns: tuple[list, list] | None = None,
+) -> dict:
+    # 各グループの先頭ページ OCR テキストから書類サマリー候補名を生成し、
+    # groups[pdf][i]["name"] に in-place で書き込む。
+    # サマリー = カテゴリ（必須）+ "-" + 取引先（任意）+ "-" + 文書番号（任意）。
+    # 戻り値は更新済みの groups dict。
 
 # pdfio.py（ユーティリティ）
 def extract_text(pdf_path: Path, page_no: int | None = None,

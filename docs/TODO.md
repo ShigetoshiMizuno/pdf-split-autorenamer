@@ -156,7 +156,7 @@ v1.0.0:
 - [x] `scripts/run_benchmark.py` 実装（Stage 1/2/3 の処理時間・JP比率・コストを計測）
 - [x] `scripts/generate_sample_pdfs.py` 実装（テキスト層あり/なし合成 PDF を生成）
 - [x] `docs/benchmark.md` 作成（計測方法・ステージ定義・推奨設定・コスト試算表）
-- [ ] 実際の教会文書 PDF で計測して benchmark.md の表を埋める（実測値収集中）
+- [ ] 実際の業務文書 PDF で計測して benchmark.md の表を埋める（実測値収集中）
 - [ ] 手書き・縦書き・低解像度スキャン PDF での検証（実機テスト環境で実施予定）
 
 ---
