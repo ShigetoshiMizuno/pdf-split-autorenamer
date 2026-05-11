@@ -300,3 +300,14 @@ class TestExtractVendorBugFixes:
             assert "2026" not in result
             import re
             assert not re.search(r"\d{4}[年/\-]\d{1,2}", result)
+
+    def test_dept_name_as_part_of_company_name(self):
+        """W-A: 部署名を社名本体に含む法人名は切り詰めない"""
+        assert extract_vendor("ABC開発部株式会社 御中") == "ABC開発部"
+        assert extract_vendor("東京技術部株式会社 様") == "東京技術部"
+        assert extract_vendor("関西営業部株式会社 御中") == "関西営業部"
+
+    def test_dept_with_space_is_trimmed(self):
+        """W-A 既存挙動維持: 空白を伴う部署名は社名外として切り詰める"""
+        # 担当者名なし・末尾が部署名でも、手前に空白があれば切り詰める
+        assert extract_vendor("関西商会 購買部 様") == "関西商会"
