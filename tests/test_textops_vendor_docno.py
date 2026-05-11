@@ -309,5 +309,5 @@ class TestExtractVendorBugFixes:
 
     def test_dept_with_space_is_trimmed(self):
         """W-A 既存挙動維持: 空白を伴う部署名は社名外として切り詰める"""
-        # 担当者名なし・末尾が部署名でも、手前に空白があれば切り詰める
-        assert extract_vendor("関西商会 購買部 様") == "関西商会"
+        # 後置会社形態あり・末尾が空白付き部署名 → 空白の前で切り詰める
+        assert extract_vendor("関西商会株式会社 購買部 様") == "関西商会"

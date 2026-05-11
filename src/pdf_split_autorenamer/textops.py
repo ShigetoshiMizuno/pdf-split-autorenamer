@@ -215,16 +215,24 @@ _DEPT_ROLE_PATTERN = re.compile(
 _DATE_IN_VENDOR = re.compile(r"\d{4}[年/\-]\d{1,2}")
 
 
-def _trim_dept_role(name: str) -> str:
+def _trim_dept_role(raw: str) -> str:
     """社名候補から部署/役職パターンが始まる位置以降を除去し、空白を除去して返す。
 
     空白除去**前**のテキストに対してパターンを適用することで正確な境界を検出する。
+
+    例外: 部署名が raw の末尾に連続していて（空白なし）、かつそれが唯一のマッチの場合は
+    社名本体の一部と判断して切り詰めない。
+    例: "ABC開発部" → そのまま / "関西商会 購買部" → "関西商会"
     """
-    m = _DEPT_ROLE_PATTERN.search(name)
-    if m:
-        name = name[: m.start()]
+    m = _DEPT_ROLE_PATTERN.search(raw)
+    if m is None:
+        return raw.replace("　", "").replace(" ", "").strip()
+    pre = raw[: m.start()]
+    # 部署名が raw の末尾で、かつ手前に空白がなければ社名の一部として保持
+    if m.end() == len(raw) and pre and not pre[-1].isspace() and pre[-1] != "　":
+        return raw.replace("　", "").replace(" ", "").strip()
     # 全角空白・半角空白を除去
-    return name.replace("　", "").replace(" ", "").strip()
+    return pre.replace("　", "").replace(" ", "").strip()
 
 
 def extract_vendor(text: str, max_len: int = 20) -> str | None:
