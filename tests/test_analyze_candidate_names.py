@@ -43,7 +43,7 @@ class TestGenerateCandidateNames:
         result = generate_candidate_names(pages, groups)
         name = result["test.pdf"][0]["name"]
         assert "2026-04-01" in name
-        assert "請求書" in name or "書類" in name  # カテゴリは既存パターンによる
+        assert "請求書" in name  # Phase B 後は業務向けパターンで「請求書」が抽出される（S-1）
         assert name != ""
 
     def test_name_is_filled(self):
@@ -174,3 +174,89 @@ class TestGenerateCandidateNames:
         pages = [_make_page()]
         result = build_initial_groups(pages)
         assert result["test.pdf"][0]["name"] == ""
+
+    # --- 業務カテゴリ別テスト（C2 追加） ---
+
+    def test_category_seikyu_sho(self):
+        """請求書カテゴリが正しく候補名に含まれる"""
+        text = (
+            "2026年4月1日\n"
+            "請求書\n"
+            "株式会社山田工業 御中\n"
+            "No. INV-001\n"
+        )
+        pages = [_make_page(text=text)]
+        groups = _make_groups(groups_data=[{"range": [1, 1], "name": ""}])
+        result = generate_candidate_names(pages, groups)
+        name = result["test.pdf"][0]["name"]
+        assert "請求書" in name
+
+    def test_category_mitsumori_sho(self):
+        """見積書カテゴリが正しく候補名に含まれる"""
+        text = (
+            "2026年5月10日\n"
+            "見積書\n"
+            "株式会社テスト商事 御中\n"
+            "No. Q-2026-001\n"
+        )
+        pages = [_make_page(text=text)]
+        groups = _make_groups(groups_data=[{"range": [1, 1], "name": ""}])
+        result = generate_candidate_names(pages, groups)
+        name = result["test.pdf"][0]["name"]
+        assert "見積書" in name
+
+    def test_category_gijiroku(self):
+        """議事録カテゴリが正しく候補名に含まれる"""
+        text = (
+            "2026年3月20日\n"
+            "議事録\n"
+            "第1回役員会\n"
+        )
+        pages = [_make_page(text=text)]
+        groups = _make_groups(groups_data=[{"range": [1, 1], "name": ""}])
+        result = generate_candidate_names(pages, groups)
+        name = result["test.pdf"][0]["name"]
+        assert "議事録" in name
+
+    def test_vendor_only_no_docno(self):
+        """取引先のみ（文書番号なし）のケース"""
+        text = (
+            "2026年4月1日\n"
+            "請求書\n"
+            "株式会社取引先商事 御中\n"
+        )
+        pages = [_make_page(text=text)]
+        groups = _make_groups(groups_data=[{"range": [1, 1], "name": ""}])
+        result = generate_candidate_names(pages, groups)
+        name = result["test.pdf"][0]["name"]
+        assert "請求書" in name
+        assert "取引先商事" in name
+        assert name.count("-") >= 1
+
+    def test_docno_only_no_vendor(self):
+        """文書番号のみ（取引先なし）のケース"""
+        text = (
+            "2026年4月1日\n"
+            "請求書\n"
+            "No. INV-2026-0401\n"
+        )
+        pages = [_make_page(text=text)]
+        groups = _make_groups(groups_data=[{"range": [1, 1], "name": ""}])
+        result = generate_candidate_names(pages, groups)
+        name = result["test.pdf"][0]["name"]
+        assert "請求書" in name
+        assert "INV-2026-0401" in name
+
+    def test_no_vendor_no_docno(self):
+        """取引先・文書番号ともに欠落 → カテゴリのみ"""
+        text = (
+            "2026年4月1日\n"
+            "請求書\n"
+            "ご確認ください\n"
+        )
+        pages = [_make_page(text=text)]
+        groups = _make_groups(groups_data=[{"range": [1, 1], "name": ""}])
+        result = generate_candidate_names(pages, groups)
+        name = result["test.pdf"][0]["name"]
+        assert "請求書" in name
+        assert "2026-04-01" in name

@@ -76,12 +76,49 @@ class TestExtractVendor:
         assert len(result) <= 5
 
     def test_first_line_priority(self):
-        """先頭 10 行内のマッチを優先する"""
+        """先頭 10 行内のマッチを優先し、先頭の社名が返ること（S-2）"""
         lines = ["株式会社最初商事 御中"] + ["本文行"] * 5 + ["株式会社後半商事 様"]
         text = "\n".join(lines)
         result = extract_vendor(text)
-        # 先頭に出現した社名が優先されるはず
         assert result is not None
+        assert "最初商事" in result
+
+    # --- 前置×殿 / 後置×御中・様・殿 / (株)前置×様・殿（S-3 追加） ---
+
+    def test_kabushiki_mae_dono(self):
+        """株式会社○○ 殿 パターン（前置×殿）"""
+        text = "株式会社前置物産 殿\n本文"
+        result = extract_vendor(text)
+        assert result is not None
+        assert "前置物産" in result
+
+    def test_kabushiki_ato_gochu(self):
+        """○○株式会社 御中 パターン（後置×御中）"""
+        text = "後置商事株式会社 御中\n本文"
+        result = extract_vendor(text)
+        assert result is not None
+        assert "後置商事" in result
+
+    def test_kabushiki_ato_dono(self):
+        """○○株式会社 殿 パターン（後置×殿）"""
+        text = "後置産業株式会社 殿\n本文"
+        result = extract_vendor(text)
+        assert result is not None
+        assert "後置産業" in result
+
+    def test_paren_kabu_prefix_sama(self):
+        """(株)○○ 様 パターン（括弧前置×様）"""
+        text = "(株)括弧商事 様\n本文"
+        result = extract_vendor(text)
+        assert result is not None
+        assert "括弧商事" in result
+
+    def test_paren_kabu_prefix_dono(self):
+        """(株)○○ 殿 パターン（括弧前置×殿）"""
+        text = "(株)括弧物産 殿\n本文"
+        result = extract_vendor(text)
+        assert result is not None
+        assert "括弧物産" in result
 
     # --- 負例 ---
 
@@ -94,6 +131,14 @@ class TestExtractVendor:
     def test_empty_string_returns_none(self):
         """空文字は None"""
         assert extract_vendor("") is None
+
+    def test_newlines_only_returns_none(self):
+        """改行のみは None（S-3 異常系）"""
+        assert extract_vendor("\n\n\n") is None
+
+    def test_spaces_only_returns_none(self):
+        """空白のみは None（S-3 異常系）"""
+        assert extract_vendor("   ") is None
 
     def test_plain_japanese_no_match(self):
         """会社名パターンに合わない日本語は None"""
@@ -162,6 +207,27 @@ class TestExtractDocNumber:
         assert result is not None
         assert len(result) <= 30
 
+    def test_fullwidth_no_dot(self):
+        """全角 Ｎｏ. パターン（S-3）"""
+        text = "Ｎｏ. 2026-0401-001\n本文"
+        result = extract_doc_number(text)
+        assert result is not None
+        assert "2026-0401-001" in result
+
+    def test_fullwidth_no_fullwidth_period(self):
+        """全角 Ｎｏ．（全角ピリオド）パターン（S-3）"""
+        text = "Ｎｏ．2026-0401-002\n本文"
+        result = extract_doc_number(text)
+        assert result is not None
+        assert "2026-0401-002" in result
+
+    def test_fullwidth_colon_seikyu(self):
+        """請求番号：（全角コロン）パターン（S-3）"""
+        text = "請求番号：INV-2026-0401\n本文"
+        result = extract_doc_number(text)
+        assert result is not None
+        assert "INV-2026-0401" in result
+
     # --- 負例 ---
 
     def test_no_number_returns_none(self):
@@ -173,3 +239,11 @@ class TestExtractDocNumber:
     def test_empty_string_returns_none(self):
         """空文字は None"""
         assert extract_doc_number("") is None
+
+    def test_newlines_only_returns_none(self):
+        """改行のみは None（S-3 異常系）"""
+        assert extract_doc_number("\n\n\n") is None
+
+    def test_spaces_only_returns_none(self):
+        """空白のみは None（S-3 異常系）"""
+        assert extract_doc_number("   ") is None
