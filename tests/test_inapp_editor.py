@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -142,6 +143,53 @@ def test_cli_main_errors_when_report_missing(tmp_path: Path, capsys):
     assert result == 1
     captured = capsys.readouterr()
     assert "report.html が見つかりません" in captured.err
+
+
+# ----------------------------------------------------------------- close_window
+def test_close_window_sets_closed_flag_and_destroys(tmp_path: Path, monkeypatch):
+    """close_window が _closed を True にし webview.windows 内の destroy を呼ぶ"""
+    import types
+    fake_win = types.SimpleNamespace(destroy=MagicMock())
+    fake_webview = types.ModuleType("webview")
+    fake_webview.windows = [fake_win]
+    monkeypatch.setitem(__import__("sys").modules, "webview", fake_webview)
+
+    bridge = inapp_editor.PsarBridge(work_dir=tmp_path)
+    result = bridge.close_window()
+
+    assert bridge.closed is True
+    assert result == {"ok": True}
+    fake_win.destroy.assert_called_once()
+
+
+def test_close_window_returns_ok_false_on_exception(tmp_path: Path, monkeypatch):
+    """close_window で例外が起きたとき ok=False を返す"""
+    import types
+    fake_webview = types.ModuleType("webview")
+    fake_webview.windows = None  # iteration で TypeError を起こす
+    monkeypatch.setitem(__import__("sys").modules, "webview", fake_webview)
+
+    bridge = inapp_editor.PsarBridge(work_dir=tmp_path)
+    result = bridge.close_window()
+
+    assert bridge.closed is True
+    assert result == {"ok": False}
+
+
+# ----------------------------------------------------------------- get_groups OSError
+def test_get_groups_returns_none_on_oserror(tmp_path: Path, monkeypatch):
+    """groups.json が存在するが OSError が出るとき None を返す"""
+    from pathlib import Path as _Path
+    import unittest.mock as _mock
+
+    bridge = inapp_editor.PsarBridge(work_dir=tmp_path)
+    target = tmp_path / "groups.json"
+    target.write_text("{}", encoding="utf-8")
+
+    with _mock.patch.object(_Path, "read_text", side_effect=OSError("permission denied")):
+        result = bridge.get_groups()
+
+    assert result is None
 
 
 def test_cli_main_errors_when_pywebview_missing(tmp_path: Path, capsys, monkeypatch):
