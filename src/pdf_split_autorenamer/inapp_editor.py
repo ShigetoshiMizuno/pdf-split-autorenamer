@@ -110,7 +110,7 @@ def open_editor(
     report_html: Path,
     work_dir: Path,
     *,
-    title: str = "pdf-split-autorenamer — アプリ内編集",
+    title: str = "PDF 分割設定 — 編集",
     width: int = 1200,
     height: int = 820,
     on_saved: Callable[[Path], None] | None = None,

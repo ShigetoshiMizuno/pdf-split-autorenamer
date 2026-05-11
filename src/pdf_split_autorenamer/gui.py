@@ -18,6 +18,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from . import analyze as _analyze
+from . import inapp_editor as _inapp
 from . import rename as _rename
 from . import split as _split
 
@@ -66,52 +67,60 @@ class App(tk.Tk):
         body = ttk.Frame(self, padding=8)
         body.pack(fill="x")
 
-        # Step 1: 解析
-        f1 = ttk.LabelFrame(body, text="1. 解析（サムネ・HTMLレポート生成）", padding=8)
+        # Step 1: 解析（解析を実行 → 完了したら自動でアプリ内編集ウィンドウへ）
+        f1 = ttk.LabelFrame(body, text="1. 解析（PDFを読み込み、書類の境界を提案）", padding=8)
         f1.pack(fill="x", **pad)
         ttk.Button(f1, text="解析を実行", command=self._on_analyze).pack(side="left")
-        # アプリ内編集（pywebview があれば優先表示）
-        from . import inapp_editor as _inapp
-        inapp_btn_text = "アプリ内で編集（推奨）" if _inapp.is_available() else "アプリ内で編集（要 pywebview）"
-        inapp_btn = ttk.Button(f1, text=inapp_btn_text, command=self._on_inapp_edit)
-        inapp_btn.pack(side="left", padx=8)
-        if not _inapp.is_available():
-            inapp_btn.state(["disabled"])
-        ttk.Button(f1, text="ブラウザで開く（フォールバック）",
-                   command=self._on_open_report).pack(side="left", padx=4)
+        ttk.Label(f1,
+                  text="押すと内容を読み取り、続けて編集ウィンドウが開きます").pack(
+            side="left", padx=12)
 
         # Step 2: 分割
-        f2 = ttk.LabelFrame(body, text="2. 分割（groups.json に従って）", padding=8)
+        f2 = ttk.LabelFrame(body, text="2. 分割（編集した内容に従って書類ごとに切り出し）", padding=8)
         f2.pack(fill="x", **pad)
-        ttk.Button(f2, text="dry-run", command=lambda: self._on_split(False)).pack(side="left")
-        ttk.Button(f2, text="実行", command=lambda: self._on_split(True)).pack(side="left", padx=8)
-        ttk.Checkbutton(f2, text="既存ファイルを上書き (--force)",
+        ttk.Button(f2, text="実行", command=lambda: self._on_split(True)).pack(side="left")
+        ttk.Checkbutton(f2, text="既存ファイルを上書きする",
                         variable=self.force_var).pack(side="left", padx=12)
+        # 詳細オプション（折りたたみ）
+        self._split_advanced_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f2, text="詳細オプション", variable=self._split_advanced_var,
+                        command=self._toggle_split_advanced).pack(side="right")
+        self._split_advanced_frame = ttk.Frame(body)  # 折りたたみコンテンツ
+        ttk.Button(self._split_advanced_frame, text="変更内容を確認するだけ（実行しない）",
+                   command=lambda: self._on_split(False)).pack(side="left", padx=8)
 
         # Step 3: リネーム
-        f3 = ttk.LabelFrame(body, text="3. 自動リネーム（内容ベース）", padding=8)
+        f3 = ttk.LabelFrame(body, text="3. 自動リネーム（内容から日付・書類タイプを決めて命名）", padding=8)
         f3.pack(fill="x", **pad)
-
-        # Step 3 上段: モード選択 + 実行ボタン
         f3_row1 = ttk.Frame(f3)
         f3_row1.pack(fill="x")
-        ttk.Radiobutton(f3_row1, text="分割直後", variable=self.rename_mode_var,
-                        value="split").pack(side="left")
-        ttk.Radiobutton(f3_row1, text="日付不明_を再考", variable=self.rename_mode_var,
-                        value="unknown").pack(side="left", padx=8)
-        ttk.Radiobutton(f3_row1, text="両方", variable=self.rename_mode_var,
-                        value="all").pack(side="left", padx=8)
-        ttk.Button(f3_row1, text="dry-run", command=lambda: self._on_rename(False)).pack(side="left", padx=12)
-        ttk.Button(f3_row1, text="実行", command=lambda: self._on_rename(True)).pack(side="left", padx=4)
-
-        # Step 3 下段: プロファイル TOML 選択
-        f3_row2 = ttk.Frame(f3)
-        f3_row2.pack(fill="x", pady=(4, 0))
-        ttk.Label(f3_row2, text="プロファイル:").pack(side="left")
-        ttk.Entry(f3_row2, textvariable=self.profile_var, state="readonly").pack(
+        ttk.Button(f3_row1, text="実行", command=lambda: self._on_rename(True)).pack(side="left")
+        # 詳細オプション（折りたたみ）
+        self._rename_advanced_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f3_row1, text="詳細オプション", variable=self._rename_advanced_var,
+                        command=self._toggle_rename_advanced).pack(side="right")
+        self._rename_advanced_frame = ttk.Frame(body)  # 折りたたみコンテンツ
+        # モード選択
+        adv_row1 = ttk.Frame(self._rename_advanced_frame)
+        adv_row1.pack(fill="x", padx=8, pady=2)
+        ttk.Label(adv_row1, text="対象:").pack(side="left")
+        ttk.Radiobutton(adv_row1, text="分割直後のファイル", variable=self.rename_mode_var,
+                        value="split").pack(side="left", padx=4)
+        ttk.Radiobutton(adv_row1, text="既存の『日付不明_』を再判定",
+                        variable=self.rename_mode_var,
+                        value="unknown").pack(side="left", padx=4)
+        ttk.Radiobutton(adv_row1, text="両方", variable=self.rename_mode_var,
+                        value="all").pack(side="left", padx=4)
+        ttk.Button(adv_row1, text="変更内容を確認するだけ（実行しない）",
+                   command=lambda: self._on_rename(False)).pack(side="left", padx=8)
+        # プロファイル
+        adv_row2 = ttk.Frame(self._rename_advanced_frame)
+        adv_row2.pack(fill="x", padx=8, pady=2)
+        ttk.Label(adv_row2, text="命名ルール（プロファイル）:").pack(side="left")
+        ttk.Entry(adv_row2, textvariable=self.profile_var, state="readonly").pack(
             side="left", fill="x", expand=True, padx=(6, 6))
-        ttk.Button(f3_row2, text="参照…", command=self._on_browse_profile).pack(side="left")
-        ttk.Button(f3_row2, text="クリア",
+        ttk.Button(adv_row2, text="参照…", command=self._on_browse_profile).pack(side="left")
+        ttk.Button(adv_row2, text="クリア",
                    command=lambda: self.profile_var.set("")).pack(side="left", padx=(4, 0))
 
         # ログエリア
@@ -221,6 +230,20 @@ class App(tk.Tk):
         lines.append("実行してよろしいですか？")
         return "\n".join(lines)
 
+    # ----- 詳細オプション折りたたみ -----
+    def _toggle_split_advanced(self) -> None:
+        if self._split_advanced_var.get():
+            self._split_advanced_frame.pack(fill="x", padx=8, pady=(0, 4),
+                                            after=self._split_advanced_frame.master.winfo_children()[1])
+        else:
+            self._split_advanced_frame.pack_forget()
+
+    def _toggle_rename_advanced(self) -> None:
+        if self._rename_advanced_var.get():
+            self._rename_advanced_frame.pack(fill="x", padx=8, pady=(0, 4))
+        else:
+            self._rename_advanced_frame.pack_forget()
+
     # ----- アクション -----
     def _on_analyze(self) -> None:
         folder = self._get_folder()
@@ -236,13 +259,30 @@ class App(tk.Tk):
             self._log(f"  ページ数: {res.get('pages', 0)}")
             self._log(f"  初期グループ数: {res.get('groups', 0)}")
             html = res.get("report_html")
-            if html:
-                self._log(f"  report.html: {html}")
-                if messagebox.askyesno("解析完了",
-                                       f"ページ {res.get('pages')}, グループ {res.get('groups')} を提案しました。\n"
-                                       "ブラウザで report.html を開きますか?"):
-                    webbrowser.open(Path(html).as_uri())
             self._set_status("解析完了")
+            if not html:
+                return
+            self._log(f"  レポート: {html}")
+            pages = res.get("pages")
+            groups = res.get("groups")
+            # 自動誘導: pywebview があれば確認 → アプリ内編集ウィンドウへ
+            if _inapp.is_available():
+                if messagebox.askyesno(
+                    "解析完了",
+                    f"ページ {pages} 件 / 書類グループ {groups} 件を提案しました。\n\n"
+                    "続けて編集ウィンドウを開いて、境界とファイル名を確認しますか？\n"
+                    "（『はい』でアプリ内に編集画面が開きます）"
+                ):
+                    self._on_inapp_edit()
+            else:
+                # フォールバック: pywebview 未導入時はブラウザを案内
+                if messagebox.askyesno(
+                    "解析完了",
+                    f"ページ {pages} 件 / 書類グループ {groups} 件を提案しました。\n\n"
+                    "ブラウザで編集画面を開きますか？\n"
+                    "（アプリ内編集には pywebview のインストールが必要です）"
+                ):
+                    webbrowser.open(Path(html).as_uri())
 
         self._run_async(do, done)
 
@@ -262,14 +302,12 @@ class App(tk.Tk):
         Tk のメインループと pywebview の GUI ループが衝突するのを避けるため、
         別プロセスで `python -m pdf_split_autorenamer.inapp_editor <work_dir>` を呼ぶ。
         """
-        from . import inapp_editor as _inapp
-
         if not _inapp.is_available():
             messagebox.showwarning(
-                "pywebview 未導入",
-                "アプリ内編集には pywebview が必要です。\n\n"
+                "編集ウィンドウを開けません",
+                "アプリ内編集には pywebview のインストールが必要です。\n\n"
                 "  pip install 'pdf-split-autorenamer[gui-inapp]'\n\n"
-                "を実行してから GUI を再起動してください。"
+                "を実行してからアプリを再起動してください。"
             )
             return
 
@@ -280,13 +318,13 @@ class App(tk.Tk):
         html = work_dir / "report.html"
         if not html.exists():
             messagebox.showwarning(
-                "警告",
-                f"レポートが未生成です。先に「解析を実行」を押してください。\n{html}"
+                "解析が完了していません",
+                "先に「1. 解析 → 解析を実行」を押してください。"
             )
             return
 
-        self._log("=== アプリ内編集 UI を起動中… ===")
-        self._set_status("アプリ内編集ウィンドウを開いています…")
+        self._log("=== 編集ウィンドウを開いています… ===")
+        self._set_status("編集ウィンドウを開いています…")
 
         import subprocess
 
@@ -302,11 +340,11 @@ class App(tk.Tk):
 
         def done(result):
             if isinstance(result, int) and result == 0:
-                self._log("=== アプリ内編集 UI を閉じました ===")
-                self._set_status("編集完了。続けて「分割 実行」を押せます")
+                self._log("=== 編集ウィンドウを閉じました ===")
+                self._set_status("編集完了。続けて「2. 分割 → 実行」を押してください")
             else:
-                self._log(f"=== アプリ内編集 UI 異常終了: {result} ===")
-                self._set_status("編集 UI でエラー")
+                self._log(f"=== 編集ウィンドウ 異常終了: {result} ===")
+                self._set_status("編集ウィンドウでエラー")
 
         self._run_async(runner, done)
 

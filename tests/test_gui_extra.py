@@ -301,8 +301,8 @@ class TestOnAnalyze:
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
 
-    def test_analyze_done_with_html_opens_browser(self, tmp_path):
-        """report_html が返ると done コールバックがブラウザ開示ダイアログを出す (lines 235-239)"""
+    def test_analyze_done_opens_browser_when_pywebview_unavailable(self, tmp_path):
+        """pywebview 未導入時: report_html が返ると done コールバックがブラウザを開く"""
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
@@ -311,12 +311,31 @@ class TestOnAnalyze:
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module._inapp, "is_available", return_value=False), \
              patch.object(gui_module.messagebox, "askyesno", return_value=True), \
              patch.object(gui_module, "webbrowser") as mwb, \
              patch.object(app, "_run_async",
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
         mwb.open.assert_called_once()
+
+    def test_analyze_done_invokes_inapp_edit_when_pywebview_available(self, tmp_path):
+        """pywebview 導入時: report_html が返ると done コールバックが _on_inapp_edit を呼ぶ"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        fake_html = str(tmp_path / "report.html")
+        mock_result = {"pages": 3, "groups": 2, "report_html": fake_html, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module._inapp, "is_available", return_value=True), \
+             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
+             patch.object(app, "_on_inapp_edit") as m_edit, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        m_edit.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
