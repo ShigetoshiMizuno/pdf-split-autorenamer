@@ -197,6 +197,32 @@ pip install "pdf-split-autorenamer[paddle]"
 | `roi` | Stage 1 → 品質低時 Stage 2（ROI クロップ） |
 | `llm` | Stage 1 → 2 → Claude LLM Vision の順に試行 |
 
+## 開発者向け: デモ PDF の再生成
+
+`docs/demo/sample_office_scan.pdf` を再生成するには [WeasyPrint](https://weasyprint.org/) と GTK3 Runtime が必要です。
+**通常の利用（既存のデモ PDF を見るだけ）には追加インストール不要**です。
+
+### セットアップ
+
+```sh
+# 1. WeasyPrint をインストール
+pip install "pdf-split-autorenamer[demo]"
+
+# 2. GTK3 Runtime をインストール
+#    Windows: winget install tschoonj.GTKForWindows
+#    Linux:   sudo apt install libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b
+#    macOS:   brew install pango
+```
+
+### 再生成
+
+```sh
+python scripts/generate_demo_pdf.py docs/demo/sample_office_scan.pdf
+```
+
+生成された PDF は `PyMuPDF.get_text()` で全 10 ページのテキストが抽出可能です。
+書類タイプ・日付を本文に含むため `psar analyze` → `psar rename` の動作確認に使えます。
+
 ## 注意
 
 - 自動命名はあくまで補助です。実行前に必ず dry-run で結果を確認してください。
