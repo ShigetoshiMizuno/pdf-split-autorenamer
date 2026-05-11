@@ -68,11 +68,12 @@ class TestExtractVendor:
 
     def test_max_len_trim(self):
         """max_len でトリムされる"""
-        long_name = "あ" * 30
-        text = f"株式会社{long_name} 御中\n本文"
-        result = extract_vendor(text, max_len=20)
+        # パターンの `.{1,20}?` 制限内に収まる社名（10文字）を使い、max_len=5 でトリムを確認
+        name = "あいうえおかきくけこ"  # 10文字
+        text = f"株式会社{name} 御中\n本文"
+        result = extract_vendor(text, max_len=5)
         assert result is not None
-        assert len(result) <= 20
+        assert len(result) <= 5
 
     def test_first_line_priority(self):
         """先頭 10 行内のマッチを優先する"""

@@ -178,6 +178,78 @@ def sanitize_filename(name: str, max_length: int = 80) -> str:
 
 # ---- プロファイル読み込み ----
 
+# ---- 取引先抽出 ----
+
+_VENDOR_PATTERNS = [
+    # パターン1: 前置会社形態 + 社名 + 敬称
+    re.compile(
+        r"(?:株式会社|有限会社|合同会社|（株）|\(株\))(.{1,20}?)\s*(?:御中|様|殿)"
+    ),
+    # パターン2: 社名 + 後置会社形態（敬称あり or なし）
+    re.compile(
+        r"(.{1,20}?)\s*(?:株式会社|有限会社|合同会社|（株）|\(株\))\s*(?:御中|様|殿)?"
+    ),
+    # パターン3: 英語社名 + 会社形態
+    re.compile(
+        r"(.{1,20}?)\s+(?:Inc\.|Co\.,?\s*Ltd\.?|Corp\.?|Ltd\.?)\s*(?:御中|様|殿)?"
+    ),
+]
+
+
+def extract_vendor(text: str, max_len: int = 20) -> str | None:
+    """文書テキスト先頭 10 行から取引先名を抽出する。
+
+    優先パターン（前置会社形態 → 後置会社形態 → 英語形態）の順に走査し、
+    最初にマッチした候補を返す。半角空白を除去し、max_len でトリムする。
+    マッチなしの場合は None を返す。
+    """
+    if not text:
+        return None
+    lines = [l for l in text.splitlines() if l.strip()][:10]
+    head = "\n".join(lines)
+    for pat in _VENDOR_PATTERNS:
+        m = pat.search(head)
+        if m:
+            name = m.group(1).replace(" ", "").strip()
+            if not name:
+                continue
+            name = sanitize_filename(name, max_length=max_len)
+            if name:
+                return name
+    return None
+
+
+# ---- 文書番号抽出 ----
+
+_DOCNO_PATTERNS = [
+    # パターン1: No. / NO. + 番号
+    re.compile(r"(?:No\.?|NO\.?)\s*[:：]?\s*([A-Z0-9][-A-Z0-9_/]{2,28})"),
+    # パターン2: 書類種別 + 番号
+    re.compile(
+        r"(?:請求|発注|見積|注文|契約|管理|稟議)番号\s*[:：]?\s*([-A-Z0-9_/]{3,30})"
+    ),
+    # パターン3: PO-XXX, Q-XXX, R-XXX 等のアルファベット略語
+    re.compile(r"\b([A-Z]{1,3}-\d{2,4}-?\d{2,4}-?\d*)\b"),
+]
+
+
+def extract_doc_number(text: str, max_len: int = 30) -> str | None:
+    """文書テキスト全体から文書番号を抽出する。
+
+    複数のパターンを順に試し、最初にマッチした番号を返す。
+    max_len でトリムする。マッチなしの場合は None を返す。
+    """
+    if not text:
+        return None
+    for pat in _DOCNO_PATTERNS:
+        m = pat.search(text)
+        if m:
+            number = m.group(1).strip()
+            if number:
+                return number[:max_len]
+    return None
+
+
 def load_profile(
     path: Path,
 ) -> tuple[list[tuple[re.Pattern[str], str]], list[tuple[re.Pattern[str], str]]]:
