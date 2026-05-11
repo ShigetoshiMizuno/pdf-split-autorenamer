@@ -181,13 +181,22 @@ def sanitize_filename(name: str, max_length: int = 80) -> str:
 # ---- 取引先抽出 ----
 
 _VENDOR_PATTERNS = [
-    # パターン1: 前置会社形態 + 社名 + 敬称
+    # パターン1: 前置会社形態 + 社名（敬称あり必須）
+    # 括弧・引用符・改行を含まない範囲で敬称まで取得（W-2 修正）
     re.compile(
-        r"(?:株式会社|有限会社|合同会社|（株）|\(株\))(.{1,20}?)\s*(?:御中|様|殿)"
+        r"(?:株式会社|有限会社|合同会社|（株）|\(株\))\s*([^（「【\n]{1,20}?)"
+        r"\s*(?:御中|様|殿)"
+    ),
+    # パターン1b: 前置会社形態 + 社名（敬称なし、行末か括弧の前まで）
+    # 空白を含まない社名専用（例: 株式会社デジタルパートナーズ）
+    re.compile(
+        r"(?:株式会社|有限会社|合同会社|（株）|\(株\))\s*([^\s（「【\n]{1,20})"
+        r"(?=\s*(?:\n|$|（|「|【))"
     ),
     # パターン2: 社名 + 後置会社形態（敬称あり or なし）
+    # [^\S\n]* を使って改行をまたぐマッチを防止（W-1 修正）
     re.compile(
-        r"(.{1,20}?)\s*(?:株式会社|有限会社|合同会社|（株）|\(株\))\s*(?:御中|様|殿)?"
+        r"(.{1,20}?)[^\S\n]*(?:株式会社|有限会社|合同会社|（株）|\(株\))[^\S\n]*(?:御中|様|殿)?"
     ),
     # パターン3: 英語社名 + 会社形態
     re.compile(
@@ -195,23 +204,55 @@ _VENDOR_PATTERNS = [
     ),
 ]
 
+# 部署・役職・担当者名の境界を示すパターン（社名の後に続く場合に切り詰める）
+# 具体的な部署名・役職名のみリストアップ。".{1,4}?部" のような汎用パターンは誤爆するため使わない
+_DEPT_ROLE_PATTERN = re.compile(
+    r"(?:部長|課長|係長|主任|担当者?|室長|本部長|社長|代表取締役?|専務|常務|理事|"
+    r"営業部|総務部|経理部|購買部|人事部|開発部|技術部|製造部|品質管理部|管理部)"
+)
+
+# 日付パターン（extract_vendor の戻り値フィルタ用）
+_DATE_IN_VENDOR = re.compile(r"\d{4}[年/\-]\d{1,2}")
+
+
+def _trim_dept_role(name: str) -> str:
+    """社名候補から部署/役職パターンが始まる位置以降を除去し、空白を除去して返す。
+
+    空白除去**前**のテキストに対してパターンを適用することで正確な境界を検出する。
+    """
+    m = _DEPT_ROLE_PATTERN.search(name)
+    if m:
+        name = name[: m.start()]
+    # 全角空白・半角空白を除去
+    return name.replace("　", "").replace(" ", "").strip()
+
 
 def extract_vendor(text: str, max_len: int = 20) -> str | None:
     """文書テキスト先頭 10 行から取引先名を抽出する。
 
     優先パターン（前置会社形態 → 後置会社形態 → 英語形態）の順に走査し、
     最初にマッチした候補を返す。半角空白を除去し、max_len でトリムする。
+    部署/役職パターンが混入している場合は社名手前で切り詰める（W-2 修正）。
+    日付パターンが含まれる場合は None を返す（W-1 追加防衛）。
     マッチなしの場合は None を返す。
     """
     if not text:
         return None
-    lines = [l for l in text.splitlines() if l.strip()][:10]
+    lines = [line for line in text.splitlines() if line.strip()][:10]
     head = "\n".join(lines)
     for pat in _VENDOR_PATTERNS:
         m = pat.search(head)
         if m:
-            name = m.group(1).replace(" ", "").strip()
+            raw = m.group(1)
+            # group(1) が敬称のみの場合は後置パターンの誤マッチ → スキップ
+            if raw.strip() in ("御中", "様", "殿"):
+                continue
+            # 空白除去前に部署/役職で切り詰め（W-2）、その後空白除去
+            name = _trim_dept_role(raw)
             if not name:
+                continue
+            # 日付パターンが含まれていたら除外（W-1 追加防衛）
+            if _DATE_IN_VENDOR.search(name):
                 continue
             name = sanitize_filename(name, max_length=max_len)
             if name:
