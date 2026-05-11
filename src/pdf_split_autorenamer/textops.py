@@ -116,28 +116,28 @@ def date_from_string(s: str) -> str | None:
 # キー: タイトル領域の正規表現 → ラベル
 
 DEFAULT_TITLE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"主日礼拝.{0,8}メッセージ要[旨約]|主日礼拝メッセージ"), "主日礼拝メッセージ要旨"),
-    (re.compile(r"水曜礼拝.{0,8}メッセージ要[旨約]"), "水曜礼拝メッセージ要旨"),
-    (re.compile(r"会計報告"), "会計報告"),
-    (re.compile(r"教会総会"), "教会総会"),
-    (re.compile(r"イースター礼拝"), "イースター礼拝"),
-    (re.compile(r"クリスマス礼拝"), "クリスマス礼拝"),
-    (re.compile(r"感謝祭"), "感謝祭"),
-    (re.compile(r"週報"), "週報"),
-    (re.compile(r"歓迎"), "週報"),
+    (re.compile(r"請求書|御請求書"), "請求書"),
+    (re.compile(r"見積書|御見積書"), "見積書"),
+    (re.compile(r"注文書|発注書"), "発注書"),
+    (re.compile(r"領収書|受領書"), "領収書"),
+    (re.compile(r"業務委託契約書|契約書"), "契約書"),
+    (re.compile(r"議事録|会議録"), "議事録"),
+    (re.compile(r"稟議書"), "稟議書"),
+    (re.compile(r"出張報告書"), "出張報告書"),
+    (re.compile(r"報告書"), "報告書"),
+    (re.compile(r"通知書|案内"), "通知書"),
+    (re.compile(r"納品書"), "納品書"),
 ]
 
 DEFAULT_BODY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"主日礼拝.{0,8}メッセージ要[旨約]"), "主日礼拝メッセージ要旨"),
-    (re.compile(r"水曜礼拝.{0,8}メッセージ要[旨約]"), "水曜礼拝メッセージ要旨"),
-    (re.compile(r"イースター礼拝"), "イースター礼拝"),
-    (re.compile(r"クリスマス礼拝"), "クリスマス礼拝"),
-    (re.compile(r"祈祷会|祈り会"), "祈祷会"),
-    (re.compile(r"学び会"), "学び会"),
-    (re.compile(r"教会学校.{0,4}シニア科|シニア科"), "教会学校シニア科"),
-    (re.compile(r"教会学校"), "教会学校"),
-    (re.compile(r"主日礼拝|聖日礼拝|水曜礼拝"), "週報"),
-    (re.compile(r"お知らせ|お和らせ"), "お知らせ"),
+    (re.compile(r"請求"), "請求書"),
+    (re.compile(r"見積"), "見積書"),
+    (re.compile(r"注文|発注"), "発注書"),
+    (re.compile(r"領収"), "領収書"),
+    (re.compile(r"契約"), "契約書"),
+    (re.compile(r"議事"), "議事録"),
+    (re.compile(r"報告"), "報告書"),
+    (re.compile(r"お知らせ|連絡"), "通知書"),
 ]
 
 
