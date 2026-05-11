@@ -48,7 +48,7 @@ class TestGenerateCandidateNames:
 
     def test_name_is_filled(self):
         """name フィールドが空でなくなる"""
-        text = "2026年3月15日\n週報\n"
+        text = "2026年3月15日\n議事録\n"
         pages = [_make_page(text=text)]
         groups = _make_groups(groups_data=[{"range": [1, 1], "name": ""}])
         result = generate_candidate_names(pages, groups)
@@ -105,7 +105,7 @@ class TestGenerateCandidateNames:
 
     def test_multiple_pdfs(self):
         """複数 PDF にまたがるグループも処理される"""
-        page1 = _make_page(pdf="a.pdf", page=1, text="2026年1月1日\n週報")
+        page1 = _make_page(pdf="a.pdf", page=1, text="2026年1月1日\n議事録")
         page2 = _make_page(pdf="b.pdf", page=1, text="2026年2月1日\n会計報告")
         pages = [page1, page2]
         groups = {
