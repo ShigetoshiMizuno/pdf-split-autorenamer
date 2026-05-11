@@ -485,7 +485,16 @@ function buildGroupsFromFlags() {
 function saveJson() {
   const data = buildGroupsFromFlags();
   const jsonStr = JSON.stringify(data, null, 2);
-  if (window.location.protocol === 'http:') {
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.save_groups) {
+    // pywebview アプリ内編集モード: bridge 経由で直接 .psar/groups.json に書き込み
+    window.pywebview.api.save_groups(jsonStr).then(r => {
+      if (r && r.ok) {
+        alert('保存しました。\nウィンドウを閉じて GUI から「分割 実行」を押してください。');
+      } else {
+        alert('保存失敗: ' + (r && r.error ? r.error : '不明なエラー'));
+      }
+    }).catch(e => alert('保存失敗: ' + e));
+  } else if (window.location.protocol === 'http:') {
     // psar serve モード: サーバーに直接保存
     fetch('/api/save-groups', {
       method: 'POST',
@@ -499,7 +508,7 @@ function saveJson() {
       }
     }).catch(e => alert('保存失敗: ' + e));
   } else {
-    // file:// プロトコル: 従来のダウンロード
+    // file:// プロトコル: 従来のダウンロード（フォールバック）
     const blob = new Blob([jsonStr], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

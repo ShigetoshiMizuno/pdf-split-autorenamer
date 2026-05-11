@@ -41,10 +41,12 @@ build = ["pyinstaller>=6.0"]
 llm = ["anthropic>=0.25", "keyring>=24.0"]
 paddle = ["paddleocr>=2.7", "paddlepaddle>=2.6"]
 easyocr = ["easyocr>=1.7"]
+gui-inapp = ["pywebview>=5.0"]
 all = [
     "anthropic>=0.25",
     "keyring>=24.0",
     "easyocr>=1.7",
+    "pywebview>=5.0",
 ]
 
 [project.urls]
