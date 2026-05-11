@@ -491,7 +491,7 @@ function render() {
       const input = document.createElement('input');
       input.type = 'text';
       input.value = names.get(nameKey) || '';
-      input.placeholder = '例) 2026-04-06_主日礼拝';
+      input.placeholder = '例) 2026-04-01_請求書-山田工業-2026-0401-001';
       input.oninput = (e) => {
         names.set(nameKey, e.target.value);
         const sib = nameWrap.nextElementSibling;
@@ -600,9 +600,12 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
                 pdftotext_path: str | None = None,
                 title: str = "PDF 分割レビュー",
                 ocr_fallback: bool = True,
-                ocr_strategy: str = "balanced") -> dict:
+                ocr_strategy: str = "balanced",
+                profile: Path | None = None) -> dict:
     """src_dir 配下のPDFを解析し、サムネ・groups.json・report.html を work_dir に出力。
-    既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。"""
+    既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。
+    profile: TOML プロファイルのパス。None の場合はデフォルトパターンを使用。
+    """
     src_dir = Path(src_dir)
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     thumb_dir = work_dir / "thumbs"
@@ -623,6 +626,15 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
         return {"pages": 0, "groups": 0}
     boundaries = build_boundary_info(pages)
     groups = build_initial_groups(pages)
+
+    # プロファイル読み込みと候補名生成
+    profile_patterns: tuple | None = None
+    if profile is not None:
+        try:
+            profile_patterns = textops.load_profile(Path(profile))
+        except Exception as e:
+            logging.warning("プロファイル読み込み失敗: %s: %s", profile, e)
+    groups = generate_candidate_names(pages, groups, profile_patterns=profile_patterns)
 
     out_json = work_dir / "groups.json"
     if out_json.exists():

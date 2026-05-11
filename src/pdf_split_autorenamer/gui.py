@@ -253,7 +253,9 @@ class App(tk.Tk):
         self._set_status("解析中…")
 
         def do():
-            return _analyze.run_analyze(folder)
+            profile_path = self.profile_var.get().strip() or None
+            profile = Path(profile_path) if profile_path else None
+            return _analyze.run_analyze(folder, profile=profile)
 
         def done(res):
             self._log(f"  ページ数: {res.get('pages', 0)}")

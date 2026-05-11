@@ -46,11 +46,13 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         else:
             logging.warning("%s --yes を付けると確認をスキップできます。", msg)
     work = Path(args.work_dir).resolve() if args.work_dir else None
+    profile = Path(args.profile).resolve() if getattr(args, "profile", None) else None
     print(f"PDF を解析中: {src}")
     res = analyze.run_analyze(src, work_dir=work, pdftotext_path=args.pdftotext,
                               title=args.title,
                               ocr_fallback=not args.no_ocr_fallback,
-                              ocr_strategy=getattr(args, "ocr_strategy", "balanced"))
+                              ocr_strategy=getattr(args, "ocr_strategy", "balanced"),
+                              profile=profile)
     print(f"  ページ数: {res.get('pages', 0)}")
     print(f"  初期グループ数: {res.get('groups', 0)}")
     print(f"  レポート: {res.get('report_html', '')}")
@@ -169,6 +171,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="OCR 戦略: fast/balanced/roi/thorough/llm")
     sp.add_argument("--yes", action="store_true",
                     help="--ocr-strategy llm 時のクラウド送信確認をスキップ")
+    sp.add_argument("--profile", help="書類タイプ判定プロファイル TOML のパス")
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_analyze)
