@@ -4,9 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>pdf-split-autorenamer — まとめスキャンPDFを、自動で仕分け＆命名</title>
-<meta name="description" content="複合機やScanSnapで一気にスキャンしたPDFを、書類ごとに分割して『日付_書類タイプ.pdf』に自動リネーム。総務・経理・営業事務の書類整理を5分で終わらせる Python ツール。" />
-<meta property="og:title" content="pdf-split-autorenamer — まとめスキャンPDFを自動仕分け" />
-<meta property="og:description" content="一般事務所の書類スキャンを、ボタン3回で分割＆命名。GUI／CLI／OCR対応。" />
+<meta name="description" content="複合機やScanSnapで一気にスキャンしたPDFを、書類ごとに分割して『日付_書類タイプ.pdf』に自動リネーム。あなたのPCにインストールして動くローカル ツール（クラウドサービスではありません）。総務・経理・営業事務の書類整理を5分で。" />
+<meta property="og:title" content="pdf-split-autorenamer — まとめスキャンPDFを自動仕分け（ローカル動作）" />
+<meta property="og:description" content="自分のPCで動くデスクトップツール。データは社外に送信されません。GUI／CLI／OCR対応。" />
 <meta property="og:type" content="website" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%232563eb'/%3E%3Ctext x='50%25' y='58%25' text-anchor='middle' font-family='sans-serif' font-size='32' font-weight='800' fill='white'%3EP%3C/text%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -116,6 +116,23 @@
         <li class="bullet">命名規則を揃える。<span class="text-slate-300">フォルダ内で表記が統一される。</span></li>
         <li class="bullet">オフライン完結も可能。<span class="text-slate-300">機密書類でも社外送信なしで動く。</span></li>
       </ul>
+
+      <!-- ローカルツール明示バッジ -->
+      <div class="mt-7 flex flex-wrap gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-xs font-semibold">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd"/></svg>
+          ローカル動作
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-xs font-semibold">
+          社外送信なし
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-slate-200 text-xs font-semibold">
+          ❌ クラウドサービスではありません
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-slate-200 text-xs font-semibold">
+          ✅ あなたのPCにインストール
+        </span>
+      </div>
       <div class="mt-9 flex flex-wrap gap-3">
         <a href="#install" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-ink-900 font-bold hover:bg-slate-100">
           いますぐ導入する →
@@ -210,29 +227,62 @@
       <p class="mt-3 text-slate-600">GUI でも CLI でも、流れは同じ。</p>
     </div>
 
-    <ol class="space-y-12">
-      <!-- Step 1 -->
-      <li class="grid md:grid-cols-12 gap-6 items-center">
-        <div class="md:col-span-5">
-          <div class="flex items-center gap-3 mb-3">
-            <span class="step-num">1</span>
-            <h3 class="text-2xl font-bold">解析（Analyze）</h3>
-          </div>
-          <p class="text-slate-700 leading-relaxed">
-            フォルダを選んで「解析」。各ページのサムネ・OCR テキスト・向き・サイズを集め、
-            <strong>境界候補</strong>を自動で出します。
-          </p>
-          <ul class="mt-4 space-y-1 text-slate-600 text-sm">
-            <li class="bullet">向きが変わるページで切る</li>
-            <li class="bullet">テキスト類似度の急変点で切る</li>
-            <li class="bullet">「請求書」「議事録」などのタイトルマーカーで切る</li>
-          </ul>
+    <ol class="space-y-16">
+      <!-- Step 1 — GUI でボタンを押す → ローカルにreport.htmlが生成 → ブラウザで開く -->
+      <li>
+        <div class="flex items-center gap-3 mb-5">
+          <span class="step-num">1</span>
+          <h3 class="text-2xl font-bold">解析（Analyze）</h3>
         </div>
-        <div class="md:col-span-7">
-          <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-            <img src="images/report-preview.svg" alt="解析結果のレポート画面" class="w-full"/>
+        <p class="text-slate-700 leading-relaxed max-w-3xl">
+          フォルダを選んで <span class="inline-block px-1.5 py-0.5 bg-brand-600 text-white rounded text-sm font-semibold">解析を実行</span> ボタンをクリック。
+          <strong>あなたのPC上で</strong>各ページのサムネ・OCR テキスト・向き・サイズを集めて、境界候補を自動推定します。
+          結果はローカルファイル <code class="bg-slate-200 px-1 rounded">.psar/report.html</code> として保存され、ブラウザで自動的に開きます。
+        </p>
+
+        <!-- 2段構成: 上 = GUIアプリ画面（ボタン強調）, 下 = ブラウザに表示される report.html -->
+        <div class="mt-8 grid md:grid-cols-12 gap-4 items-stretch">
+          <!-- 左: GUI アプリ画面 -->
+          <figure class="md:col-span-5 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600 flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+              <strong class="text-slate-800">デスクトップアプリ</strong>
+              <span class="ml-auto text-slate-400">pdf-split-autorenamer (Tkinter GUI)</span>
+            </div>
+            <img src="images/gui-analyze-highlight.svg" alt="GUI画面の「解析を実行」ボタンを強調" class="w-full bg-white"/>
+            <figcaption class="px-4 pb-3 pt-1 text-xs text-slate-600">
+              ① あなたのPCのアプリ画面で <strong>「解析を実行」</strong> をクリック
+            </figcaption>
+          </figure>
+
+          <!-- 中央: 矢印 -->
+          <div class="md:col-span-2 flex md:flex-col items-center justify-center gap-2 text-brand-600">
+            <svg class="hidden md:block w-12 h-12" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            <svg class="md:hidden w-10 h-10 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            <span class="text-xs font-semibold text-slate-600 text-center leading-tight">
+              ローカルで<br/>処理 →<br/>ブラウザに<br/>結果表示
+            </span>
           </div>
+
+          <!-- 右: ブラウザに表示される report.html -->
+          <figure class="md:col-span-5 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600 flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-sky-500"></span>
+              <strong class="text-slate-800">ブラウザ（ローカルファイル）</strong>
+              <span class="ml-auto text-slate-400 font-mono">file:///.../.psar/report.html</span>
+            </div>
+            <img src="images/report-preview.svg" alt="生成された report.html — 解析結果のレポート画面" class="w-full bg-white"/>
+            <figcaption class="px-4 pb-3 pt-1 text-xs text-slate-600">
+              ② 同じPC内の <code class="bg-slate-200 px-1 rounded">report.html</code> がブラウザで開く（社外送信なし）
+            </figcaption>
+          </figure>
         </div>
+
+        <ul class="mt-6 grid md:grid-cols-3 gap-2 text-slate-600 text-sm max-w-3xl">
+          <li class="bullet">向きが変わるページで切る</li>
+          <li class="bullet">テキスト類似度の急変点で切る</li>
+          <li class="bullet">タイトルマーカー（「請求書」「議事録」など）で切る</li>
+        </ul>
       </li>
 
       <!-- Step 2 -->
@@ -460,6 +510,12 @@ psar rename   ./scanned_pdfs</code></pre>
       <strong>⚙ 動作要件:</strong> Python 3.10 以上 / Windows 10+ / macOS 12+ / 主要 Linux ディストリ。
       実行ファイル版は別途インストール不要（Python は不要）。Poppler / Tesseract は精度向上のため別途推奨。
     </div>
+    <div class="mt-4 rounded-2xl bg-emerald-50 border border-emerald-200 p-6 text-emerald-900">
+      <strong>🔒 動作モデル:</strong>
+      これは <strong>あなたのPCにインストールして動くデスクトップツール</strong>です。
+      クラウドサーバーや SaaS ではなく、サインアップ・月額課金もありません。
+      PDF データはあなたのPCの中だけで処理されます（Stage 3 LLM Vision を有効化した場合のみ、明示的に外部APIへ送信）。
+    </div>
   </div>
 </section>
 
@@ -472,6 +528,20 @@ psar rename   ./scanned_pdfs</code></pre>
     </div>
 
     <div class="space-y-3">
+      <details class="rounded-xl bg-white border border-slate-200 p-5 group" open>
+        <summary class="flex justify-between items-center font-semibold">
+          <span>これは Web サービス（SaaS）ですか？</span>
+          <span class="transition group-open:rotate-180 text-slate-400">▾</span>
+        </summary>
+        <p class="mt-3 text-slate-700 leading-relaxed">
+          <strong>いいえ。あなたのPCにインストールして動くデスクトップツール</strong>です。
+          サインアップやログインはなく、月額課金もありません。
+          ブラウザ画面（解析レポート）も <code class="bg-slate-200 px-1 rounded">file:///</code> で開く<strong>ローカルのHTMLファイル</strong>で、
+          どこかのサーバーに繋がっているわけではありません。
+          MIT ライセンスのオープンソースで、ソースコードはすべて公開されています。
+        </p>
+      </details>
+
       <details class="rounded-xl bg-white border border-slate-200 p-5 group">
         <summary class="flex justify-between items-center font-semibold">
           <span>機密書類でも使えますか？社外送信されませんか？</span>
