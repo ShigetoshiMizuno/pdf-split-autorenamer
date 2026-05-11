@@ -67,6 +67,8 @@ pip install -e .
 
 ### GUI（推奨）
 
+**Windows でダブルクリック起動する場合** — リポジトリ同梱の `psar-gui.bat` (v0.3.0) を使います。
+
 ```sh
 psar gui
 # または
