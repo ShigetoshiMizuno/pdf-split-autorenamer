@@ -443,7 +443,7 @@ class TestRenderHtmlReport:
 # ---------------------------------------------------------------------------
 
 class TestRunAnalyze:
-    def _make_pdf(self, path, text: str = "2026年4月6日の週報") -> None:
+    def _make_pdf(self, path, text: str = "2026年4月6日の議事録") -> None:
         import fitz
         doc = fitz.open()
         page = doc.new_page()

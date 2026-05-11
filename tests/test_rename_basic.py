@@ -31,13 +31,13 @@ def _make_pdf(path: Path, pages: int = 1, text: str = "") -> Path:
 
 class TestExistingNamePart:
     def test_split_filename_returns_name(self):
-        assert existing_name_part("scan_01_週報.pdf") == "週報"
+        assert existing_name_part("scan_01_議事録.pdf") == "議事録"
 
     def test_unknown_filename_returns_name(self):
-        assert existing_name_part("日付不明_週報.pdf") == "週報"
+        assert existing_name_part("日付不明_議事録.pdf") == "議事録"
 
     def test_dated_filename_returns_name(self):
-        assert existing_name_part("2026-04-06_週報.pdf") == "週報"
+        assert existing_name_part("2026-04-06_議事録.pdf") == "議事録"
 
     def test_plain_filename_returns_empty(self):
         assert existing_name_part("scan.pdf") == ""
@@ -52,8 +52,8 @@ class TestDateFromFilename:
         assert date_from_filename("scan_01.pdf") is None
 
     def test_returns_none_for_dated_file(self):
-        # DATED_PAT file: existing_name_part returns "週報", no date in "週報"
-        assert date_from_filename("2026-04-06_週報.pdf") is None
+        # DATED_PAT file: existing_name_part returns "議事録", no date in "議事録"
+        assert date_from_filename("2026-04-06_議事録.pdf") is None
 
 
 class TestChooseDate:
@@ -74,9 +74,9 @@ class TestChooseDate:
 
 class TestFallbackTitle:
     def test_strips_date_from_name(self):
-        result = fallback_title("scan_01_2026-04-06_週報.pdf")
+        result = fallback_title("scan_01_2026-04-06_議事録.pdf")
         assert "2026" not in result
-        assert "週報" in result
+        assert "議事録" in result
 
     def test_returns_empty_for_no_name(self):
         result = fallback_title("scan_01.pdf")
@@ -90,18 +90,18 @@ class TestFindTargets:
         assert len(result) == 1
 
     def test_split_mode_excludes_dated_files(self, tmp_path):
-        (tmp_path / "2026-04-06_週報.pdf").write_bytes(b"%PDF-1.4")
+        (tmp_path / "2026-04-06_議事録.pdf").write_bytes(b"%PDF-1.4")
         result = find_targets(tmp_path, mode="split")
         assert len(result) == 0
 
     def test_unknown_mode_finds_unknown_files(self, tmp_path):
-        (tmp_path / "日付不明_週報.pdf").write_bytes(b"%PDF-1.4")
+        (tmp_path / "日付不明_議事録.pdf").write_bytes(b"%PDF-1.4")
         result = find_targets(tmp_path, mode="unknown")
         assert len(result) == 1
 
     def test_all_mode_finds_both(self, tmp_path):
         (tmp_path / "scan_01.pdf").write_bytes(b"%PDF-1.4")
-        (tmp_path / "日付不明_週報.pdf").write_bytes(b"%PDF-1.4")
+        (tmp_path / "日付不明_議事録.pdf").write_bytes(b"%PDF-1.4")
         result = find_targets(tmp_path, mode="all")
         assert len(result) == 2
 
@@ -114,24 +114,24 @@ class TestFindTargets:
 class TestResolveFilenames:
     def test_no_duplicates_no_suffix(self):
         plan = [
-            {"date": "2026-04-06", "kind": "週報", "fallback": ""},
-            {"date": "2026-04-07", "kind": "週報", "fallback": ""},
+            {"date": "2026-04-06", "kind": "議事録", "fallback": ""},
+            {"date": "2026-04-07", "kind": "議事録", "fallback": ""},
         ]
         result = resolve_filenames(plan)
-        assert result[0]["final"] == "2026-04-06_週報.pdf"
-        assert result[1]["final"] == "2026-04-07_週報.pdf"
+        assert result[0]["final"] == "2026-04-06_議事録.pdf"
+        assert result[1]["final"] == "2026-04-07_議事録.pdf"
 
     def test_duplicates_get_suffix(self):
         plan = [
-            {"date": "2026-04-06", "kind": "週報", "fallback": ""},
-            {"date": "2026-04-06", "kind": "週報", "fallback": ""},
+            {"date": "2026-04-06", "kind": "議事録", "fallback": ""},
+            {"date": "2026-04-06", "kind": "議事録", "fallback": ""},
         ]
         result = resolve_filenames(plan)
-        assert result[0]["final"] == "2026-04-06_週報_01.pdf"
-        assert result[1]["final"] == "2026-04-06_週報_02.pdf"
+        assert result[0]["final"] == "2026-04-06_議事録_01.pdf"
+        assert result[1]["final"] == "2026-04-06_議事録_02.pdf"
 
     def test_no_date_uses_unknown_prefix(self):
-        plan = [{"date": None, "kind": "週報", "fallback": ""}]
+        plan = [{"date": None, "kind": "議事録", "fallback": ""}]
         result = resolve_filenames(plan)
         assert result[0]["final"].startswith("日付不明_")
 
@@ -146,7 +146,7 @@ class TestFindTargetsEdgeCases:
 
     def test_all_mode_does_not_include_dated_non_unknown(self, tmp_path):
         # DATED_PAT match but NOT UNKNOWN → should be skipped even in "all" mode
-        (tmp_path / "2026-04-06_週報.pdf").write_bytes(b"%PDF-1.4")
+        (tmp_path / "2026-04-06_議事録.pdf").write_bytes(b"%PDF-1.4")
         result = find_targets(tmp_path, mode="all")
         assert len(result) == 0
 
@@ -166,14 +166,14 @@ class TestRunRename:
 
     def test_apply_renames_file(self, tmp_path):
         src = tmp_path / "scan_01.pdf"
-        _make_pdf(src, text="2026年4月6日 週報")
+        _make_pdf(src, text="2026年4月6日 議事録")
         result = run_rename(tmp_path, mode="split", apply=True)
         assert result["applied"] == 1
         assert not src.exists()
 
     def test_noop_when_already_correctly_named(self, tmp_path):
         src = tmp_path / "scan_01.pdf"
-        _make_pdf(src, text="2026年4月6日 週報")
+        _make_pdf(src, text="2026年4月6日 議事録")
         run_rename(tmp_path, mode="split", apply=True)
         # second run: file is now dated, should not be targeted
         result = run_rename(tmp_path, mode="split")
@@ -181,7 +181,7 @@ class TestRunRename:
 
     def test_conflict_when_dst_exists(self, tmp_path):
         src = tmp_path / "scan_01.pdf"
-        _make_pdf(src, text="2026年4月6日 週報")
+        _make_pdf(src, text="2026年4月6日 議事録")
         # Pre-create the destination file (different inode)
         dst_name = None
         dry_run = run_rename(tmp_path, mode="split")
@@ -196,7 +196,7 @@ class TestRunRename:
 
     def test_kind_from_filename_hint(self, tmp_path):
         # When text doesn't match, fallback to filename-based kind
-        src = tmp_path / "scan_01_週報.pdf"
+        src = tmp_path / "scan_01_議事録.pdf"
         _make_pdf(src)  # empty PDF, no text content
         result = run_rename(tmp_path, mode="split")
         actions = result["actions"]
@@ -209,8 +209,8 @@ class TestRunRename:
         assert result["targets"] >= 1
 
     def test_noop_when_destination_equals_source(self, tmp_path):
-        # "日付不明_週報.pdf" → kind="週報", date=None → final="日付不明_週報.pdf" (same name)
-        src = tmp_path / "日付不明_週報.pdf"
+        # "日付不明_議事録.pdf" → kind="議事録", date=None → final="日付不明_議事録.pdf" (same name)
+        src = tmp_path / "日付不明_議事録.pdf"
         _make_pdf(src)  # no text, kind inferred from filename
         result = run_rename(tmp_path, mode="unknown")
         assert any(a["status"] == "noop" for a in result["actions"])
@@ -218,7 +218,7 @@ class TestRunRename:
     def test_rename_error_sets_error_status(self, tmp_path):
         from unittest.mock import patch
         src = tmp_path / "scan_01.pdf"
-        _make_pdf(src, text="2026年4月6日 週報")
+        _make_pdf(src, text="2026年4月6日 議事録")
         with patch.object(Path, "rename", side_effect=OSError("permission denied")):
             result = run_rename(tmp_path, mode="split", apply=True)
         assert any(a["status"].startswith("error:") for a in result["actions"])

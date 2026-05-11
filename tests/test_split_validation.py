@@ -149,13 +149,13 @@ class TestRunSplitErrors:
         work_dir = tmp_path / ".psar"
         work_dir.mkdir()
         (work_dir / "groups.json").write_text(
-            json.dumps({"scan.pdf": [{"range": [1, 2], "name": "週報"}]}),
+            json.dumps({"scan.pdf": [{"range": [1, 2], "name": "議事録"}]}),
             encoding="utf-8",
         )
         summary = run_split(tmp_path, work_dir=work_dir)
         assert summary["files_written"] == 1
         out_name = summary["actions"][0]["out"]
-        assert "週報" in out_name
+        assert "議事録" in out_name
 
 
 class TestValidateGroupsDuplicate:

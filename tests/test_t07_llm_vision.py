@@ -124,10 +124,10 @@ class TestStructuredOutputValidation:
     def test_validate_structured_output_valid(self):
         """有効な structured output はそのまま返す"""
         from pdf_split_autorenamer.ocr_backend import validate_structured_output
-        data = {"date": "2026-05-11", "title": "主日礼拝"}
+        data = {"date": "2026-05-11", "title": "請求書"}
         result = validate_structured_output(data)
         assert result["date"] == "2026-05-11"
-        assert result["title"] == "主日礼拝"
+        assert result["title"] == "請求書"
 
     def test_validate_structured_output_null_date(self):
         """null 日付は None として返す"""

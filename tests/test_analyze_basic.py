@@ -102,7 +102,7 @@ class TestScoreBoundary:
         assert "別PDF" in reasons
 
     def test_same_pdf_similar_pages_low_score(self):
-        text = "これはテスト文書です週報二〇二六年"
+        text = "これはテスト文書です議事録二〇二六年"
         p1 = self._make_page(text=text)
         p2 = self._make_page(text=text)
         score, _ = score_boundary(p1, p2)
@@ -131,7 +131,7 @@ class TestScoreBoundary:
 
     def test_default_similar_reason_when_no_other_signal(self):
         # j=1.0 (identical text), same orient/size, no new titles → default "類似" reason
-        text = "週報 二〇二六年四月六日"
+        text = "議事録 二〇二六年四月六日"
         p1 = self._make_page(text=text)
         p2 = self._make_page(text=text)
         score, reasons = score_boundary(p1, p2)

@@ -250,7 +250,7 @@ class TestBuildRenameSummary:
         res = {
             "targets": 2,
             "actions": [{"status": "dry-run", "src": "old.pdf", "src_display": "old.pdf",
-                          "dst": "2026-04-06_週報.pdf", "date": "2026-04-06", "kind": "週報"}],
+                          "dst": "2026-04-06_議事録.pdf", "date": "2026-04-06", "kind": "議事録"}],
         }
         s = App._build_rename_summary(res, "split")
         assert "2 件" in s
@@ -261,7 +261,7 @@ class TestBuildRenameSummary:
         res = {
             "targets": 1,
             "actions": [{"status": "skip", "src": "old.pdf", "src_display": "old.pdf",
-                          "dst": "new.pdf", "date": "2026-04-06", "kind": "週報"}],
+                          "dst": "new.pdf", "date": "2026-04-06", "kind": "議事録"}],
         }
         s = App._build_rename_summary(res, "split")
         assert "skip" in s

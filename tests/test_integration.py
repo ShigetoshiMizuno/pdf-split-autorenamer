@@ -26,7 +26,7 @@ def _make_pdf(path: Path, pages: int = 3, text: str = "") -> Path:
 
 class TestFullWorkflow:
     def test_analyze_creates_groups_json(self, tmp_path):
-        src = _make_pdf(tmp_path / "scan.pdf", pages=3, text="週報")
+        src = _make_pdf(tmp_path / "scan.pdf", pages=3, text="議事録")
         work_dir = tmp_path / ".psar"
         result = run_analyze(tmp_path, work_dir=work_dir)
         assert result["pages"] == 3
@@ -34,7 +34,7 @@ class TestFullWorkflow:
         assert (work_dir / "report.html").exists()
 
     def test_analyze_then_split(self, tmp_path):
-        src = _make_pdf(tmp_path / "scan.pdf", pages=4, text="週報")
+        src = _make_pdf(tmp_path / "scan.pdf", pages=4, text="議事録")
         work_dir = tmp_path / ".psar"
         run_analyze(tmp_path, work_dir=work_dir)
         # Manually set simple groups
@@ -75,7 +75,7 @@ class TestFullWorkflow:
 
     def test_full_pipeline(self, tmp_path):
         # Full: create PDF → analyze → edit groups → split → rename
-        src = _make_pdf(tmp_path / "scan.pdf", pages=2, text="2026年4月6日 週報")
+        src = _make_pdf(tmp_path / "scan.pdf", pages=2, text="2026年4月6日 議事録")
         work_dir = tmp_path / ".psar"
         run_analyze(tmp_path, work_dir=work_dir)
 
@@ -94,7 +94,7 @@ class TestFullWorkflow:
 
     def test_idempotent_rename(self, tmp_path):
         # Running rename twice should not change anything on second run
-        src = _make_pdf(tmp_path / "scan_01.pdf", text="2026年4月6日 週報")
+        src = _make_pdf(tmp_path / "scan_01.pdf", text="2026年4月6日 議事録")
         first = run_rename(tmp_path, mode="split", apply=True)
         assert first["applied"] == 1
         # Second run: file is now dated, should find no targets
