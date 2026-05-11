@@ -11,12 +11,12 @@ import os
 import sys
 
 if sys.platform == "win32":
-    _gtk_bin = r"C:\Program Files\GTK3-Runtime Win64\bin"
-    if os.path.isdir(_gtk_bin):
+    _GTK_BIN = os.environ.get("PSAR_GTK_BIN", r"C:\Program Files\GTK3-Runtime Win64\bin")
+    if os.path.isdir(_GTK_BIN):
         # cffi (_load_backend_lib) は ctypes.util.find_library 経由で PATH を見るため
         # os.add_dll_directory だけでは足りない。PATH にも追加する。
-        os.environ["PATH"] = _gtk_bin + os.pathsep + os.environ.get("PATH", "")
+        os.environ["PATH"] = _GTK_BIN + os.pathsep + os.environ.get("PATH", "")
         try:
-            os.add_dll_directory(_gtk_bin)
+            os.add_dll_directory(_GTK_BIN)
         except OSError:
             pass

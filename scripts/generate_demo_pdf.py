@@ -23,11 +23,11 @@ from pathlib import Path
 if sys.platform == "win32":
     import os
 
-    _gtk_bin = r"C:\Program Files\GTK3-Runtime Win64\bin"
-    if os.path.isdir(_gtk_bin):
-        os.environ["PATH"] = _gtk_bin + os.pathsep + os.environ.get("PATH", "")
+    _GTK_BIN = os.environ.get("PSAR_GTK_BIN", r"C:\Program Files\GTK3-Runtime Win64\bin")
+    if os.path.isdir(_GTK_BIN):
+        os.environ["PATH"] = _GTK_BIN + os.pathsep + os.environ.get("PATH", "")
         try:
-            os.add_dll_directory(_gtk_bin)
+            os.add_dll_directory(_GTK_BIN)
         except OSError:
             pass
 

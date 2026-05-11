@@ -22,11 +22,11 @@ except ImportError:
 if sys.platform == "win32":
     import os
 
-    gtk_bin = r"C:\Program Files\GTK3-Runtime Win64\bin"
-    if not Path(gtk_bin).exists():
+    _GTK_BIN = os.environ.get("PSAR_GTK_BIN", r"C:\Program Files\GTK3-Runtime Win64\bin")
+    if not Path(_GTK_BIN).exists():
         pytest.skip("GTK3 Runtime が見つかりません", allow_module_level=True)
     try:
-        os.add_dll_directory(gtk_bin)
+        os.add_dll_directory(_GTK_BIN)
     except OSError as exc:
         pytest.skip(f"GTK DLL ロード失敗: {exc}", allow_module_level=True)
 
