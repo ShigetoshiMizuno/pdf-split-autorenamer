@@ -99,6 +99,24 @@ class TestAnalyzeParser:
         args = p.parse_args(["analyze", "./folder", "--quiet"])
         assert args.quiet is True
 
+    def test_analyze_profile_help_says_glossary(self):
+        """issue #50: analyze --profile の help 文言に「用語集」が含まれること"""
+        import io
+        p = build_parser()
+        buf = io.StringIO()
+        try:
+            p.parse_args(["analyze", "--help"])
+        except SystemExit:
+            pass
+        # argparse の help テキストを formatter から取得
+        formatter = p._subparsers._actions[-1].choices["analyze"]._get_formatter()
+        formatter.add_arguments(
+            p._subparsers._actions[-1].choices["analyze"]._option_string_actions.values()
+        )
+        help_text = formatter.format_help()
+        assert "用語集" in help_text, \
+            f"analyze --profile の help に「用語集」がない (issue #50): {help_text}"
+
 
 # ---------------------------------------------------------------------------
 # split サブコマンド
@@ -346,6 +364,43 @@ class TestCmdAnalyze:
              patch("builtins.input", return_value="n"):
             result = cmd_analyze(args)
         assert result == 1
+
+    def test_cmd_analyze_print_uses_user_friendly_terms(self, tmp_path, capsys):
+        """issue #50: cmd_analyze の print 出力に「編集画面」「分割設定」が含まれること
+
+        「report.html」「groups.json」といった内部用語を直接表示しないこと。
+        """
+        from pdf_split_autorenamer.cli import cmd_analyze
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            pdftotext=None,
+            title="Test",
+            no_ocr_fallback=False,
+            ocr_strategy="balanced",
+            yes=False,
+            profile=None,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {
+            "pages": 3,
+            "groups": 2,
+            "report_html": str(tmp_path / "report.html"),
+            "groups_json": str(tmp_path / "groups.json"),
+        }
+        with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
+            cmd_analyze(args)
+        captured = capsys.readouterr()
+        # ユーザー向け用語が含まれること
+        assert "編集画面" in captured.out or "分割設定" in captured.out, \
+            f"issue #50: 「編集画面」または「分割設定」が CLI 出力にない: {captured.out!r}"
+        # 内部ファイル名が直接表示されないこと
+        assert "report.html" not in captured.out, \
+            f"issue #50: 内部ファイル名 'report.html' が CLI 出力に露出している: {captured.out!r}"
+        assert "groups.json" not in captured.out, \
+            f"issue #50: 内部ファイル名 'groups.json' が CLI 出力に露出している: {captured.out!r}"
 
 
 class TestCmdSplit:

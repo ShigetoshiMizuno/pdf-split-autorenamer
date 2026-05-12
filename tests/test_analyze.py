@@ -392,6 +392,24 @@ class TestHtmlTemplateSaveJson:
                 f"保存成功通知の文言 '{phrase}' が残っている (issue #39)"
             )
 
+    def test_download_button_uses_user_friendly_term(self):
+        """issue #50: file:// モードのダウンロードボタン文言が「分割設定を保存」であること
+
+        HTML ボタンや a.download の案内アラートに「groups.json」という
+        内部用語を直接表示しないこと。
+        """
+        # 「分割設定を保存」などのユーザー向け表現が含まれていること
+        assert "分割設定" in HTML_TEMPLATE, \
+            "「分割設定」というユーザー向け表現が HTML_TEMPLATE にない (issue #50)"
+
+    def test_work_folder_alert_uses_user_friendly_term(self):
+        """issue #50: file:// モードの案内アラートに「作業フォルダ」が使われること
+
+        「.psar」という内部パスをユーザーに見せず「作業フォルダ」と表示すること。
+        """
+        assert "作業フォルダ" in HTML_TEMPLATE, \
+            "「作業フォルダ」というユーザー向け表現が HTML_TEMPLATE にない (issue #50)"
+
 
 # ---------------------------------------------------------------------------
 # build_boundary_info
