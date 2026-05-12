@@ -297,12 +297,13 @@ class TestOnAnalyze:
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "showwarning"), \
              patch.object(app, "_run_async",
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
 
-    def test_analyze_done_with_html_opens_browser(self, tmp_path):
-        """report_html が返ると done コールバックがブラウザ開示ダイアログを出す (lines 235-239)"""
+    def test_analyze_done_with_html_opens_browser_without_dialog(self, tmp_path):
+        """issue #37: 正常解析時はダイアログなしで webbrowser.open が呼ばれる"""
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
@@ -311,12 +312,70 @@ class TestOnAnalyze:
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
-             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
+             patch.object(gui_module.messagebox, "askyesno") as masky, \
+             patch.object(gui_module.messagebox, "showwarning") as msw, \
              patch.object(gui_module, "webbrowser") as mwb, \
              patch.object(app, "_run_async",
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
+        # 確認ダイアログは出さない
+        masky.assert_not_called()
+        msw.assert_not_called()
+        # ブラウザは自動で開く
         mwb.open.assert_called_once()
+
+    def test_analyze_done_pages_zero_shows_warning(self, tmp_path):
+        """issue #37: pages == 0 → 警告ダイアログ、ブラウザは開かない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        fake_html = str(tmp_path / "report.html")
+        mock_result = {"pages": 0, "groups": 0, "report_html": fake_html, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "showwarning") as msw, \
+             patch.object(gui_module, "webbrowser") as mwb, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        msw.assert_called_once()
+        mwb.open.assert_not_called()
+
+    def test_analyze_done_groups_zero_shows_warning(self, tmp_path):
+        """issue #37: groups == 0 (pages > 0) → 警告ダイアログ、ブラウザは開かない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        fake_html = str(tmp_path / "report.html")
+        mock_result = {"pages": 5, "groups": 0, "report_html": fake_html, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "showwarning") as msw, \
+             patch.object(gui_module, "webbrowser") as mwb, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        msw.assert_called_once()
+        mwb.open.assert_not_called()
+
+    def test_analyze_done_html_missing_shows_warning(self, tmp_path):
+        """issue #37: report_html が None → 警告ダイアログ、ブラウザは開かない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        mock_result = {"pages": 3, "groups": 2, "report_html": None, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "showwarning") as msw, \
+             patch.object(gui_module, "webbrowser") as mwb, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        msw.assert_called_once()
+        mwb.open.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
