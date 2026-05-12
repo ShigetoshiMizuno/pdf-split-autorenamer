@@ -53,6 +53,7 @@ def _make_app(folder: str = "") -> object:
         app = gui_module.App()
     app.__dict__.update({
         "folder_var": _StringVar(folder),
+        "profile_var": _StringVar(""),
         "force_var": _BooleanVar(False),
         "status_var": _StringVar("待機中"),
         "log": MagicMock(),

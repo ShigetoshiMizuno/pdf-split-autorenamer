@@ -55,11 +55,11 @@ def cmd_analyze(args: argparse.Namespace) -> int:
                               profile=profile)
     print(f"  ページ数: {res.get('pages', 0)}")
     print(f"  初期グループ数: {res.get('groups', 0)}")
-    print(f"  レポート: {res.get('report_html', '')}")
-    print(f"  groups.json: {res.get('groups_json', '')}")
+    print(f"  編集画面: {res.get('report_html', '')}")
+    print(f"  分割設定: {res.get('groups_json', '')}")
     print()
-    print(f"次の手順: ブラウザで report.html を開き、境界とファイル名を編集して")
-    print(f"          groups.json を保存。完了したら `psar split` を実行。")
+    print(f"次の手順: 編集画面（ブラウザ）で境界とファイル名を編集して分割設定を保存。")
+    print(f"          完了したら `psar split` を実行。")
     return 0
 
 
@@ -171,12 +171,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="OCR 戦略: fast/balanced/roi/thorough/llm")
     sp.add_argument("--yes", action="store_true",
                     help="--ocr-strategy llm 時のクラウド送信確認をスキップ")
-    sp.add_argument("--profile", help="書類タイプ判定プロファイル TOML のパス")
+    sp.add_argument("--profile", help="用語集 TOML のパス")
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_analyze)
 
-    sp = sub.add_parser("split", help="groups.json に従って分割を実行")
+    sp = sub.add_parser("split", help="保存済み分割設定に従って分割を実行")
     sp.add_argument("folder", help="PDFが入っているフォルダ")
     sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
     sp.add_argument("--dry-run", action="store_true", help="計画のみ表示")
@@ -194,12 +194,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--pdftotext", help="pdftotext.exe のパス (省略時は自動検出)")
     sp.add_argument("--no-ocr-fallback", action="store_true",
                     help="Tesseract による OCR フォールバックを無効化")
-    sp.add_argument("--profile", help="書類タイプ判定プロファイル TOML のパス")
+    sp.add_argument("--profile", help="用語集 TOML のパス")
     sp.add_argument("--verbose", action="store_true", help="詳細ログを表示 (DEBUG)")
     sp.add_argument("--quiet", action="store_true", help="警告以上のみ表示 (WARNING)")
     sp.set_defaults(func=cmd_rename)
 
-    sp = sub.add_parser("serve", help="report.html をローカルHTTPで配信（groups.json 直接保存）")
+    sp = sub.add_parser("serve", help="編集画面（ブラウザ）をローカルHTTPで配信（分割設定を直接保存）")
     sp.add_argument("folder", help="PDFが入っているフォルダ")
     sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
     sp.add_argument("--port", type=int, default=8765, help="HTTPポート番号 (既定: 8765)")

@@ -133,3 +133,18 @@ class TestCmdRename:
         (tmp_path / "scan_01.pdf").write_bytes(b"%PDF-1.4")
         result = main(["rename", str(tmp_path)])
         assert result == 0
+
+
+class TestSplitUserFriendlyError:
+    def test_missing_split_config_error_uses_user_friendly_term(self, tmp_path):
+        """issue #50: 分割設定が見つからない場合のエラーメッセージが「分割設定」を使うこと
+
+        内部ファイル名「groups.json」をユーザーに見せず「分割設定」と案内する。
+        """
+        from pdf_split_autorenamer.split import run_split
+        import pytest
+        with pytest.raises(FileNotFoundError) as exc_info:
+            run_split(tmp_path)
+        error_msg = str(exc_info.value)
+        assert "分割設定" in error_msg, \
+            f"issue #50: FileNotFoundError のメッセージに「分割設定」がない: {error_msg!r}"

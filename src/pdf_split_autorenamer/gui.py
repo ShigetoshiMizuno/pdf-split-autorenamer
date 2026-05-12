@@ -4,7 +4,7 @@
 2ステップを画面上のボタンで進めるシンプルなUI。
 - フォルダ選択
 - [解析] → サムネ・HTMLレポート生成 → ブラウザで自動オープン
-- [分割 dry-run] / [分割 実行] → groups.json から分割（命名は編集ウィンドウで決定）
+- [分割 dry-run] / [分割 実行] → 分割設定から分割（命名は編集ウィンドウで決定）
 
 issue #40: かつての Step 3 「自動リネーム」は Step 2 分割に取り込まれた。
 CLI の `psar rename` は引き続き利用可能。
@@ -48,6 +48,7 @@ class App(tk.Tk):
         self.minsize(640, 480)
 
         self.folder_var = tk.StringVar(value=initial_folder or "")
+        self.profile_var = tk.StringVar(value="")
         self.force_var = tk.BooleanVar(value=False)
 
         self._build_ui()
@@ -62,6 +63,15 @@ class App(tk.Tk):
         ent.pack(side="left", fill="x", expand=True, padx=(6, 6))
         ttk.Button(top, text="フォルダ…", command=self._on_browse).pack(side="left")
         ttk.Button(top, text="ファイル…", command=self._on_browse_file).pack(side="left", padx=(4, 0))
+
+        # 用語集（任意）: issue #50
+        profile_row = ttk.Frame(self, padding=(8, 0, 8, 4))
+        profile_row.pack(fill="x")
+        ttk.Label(profile_row, text="用語集（任意）:").pack(side="left")
+        ttk.Entry(profile_row, textvariable=self.profile_var).pack(
+            side="left", fill="x", expand=True, padx=(6, 6))
+        ttk.Button(profile_row, text="参照…",
+                   command=self._on_browse_profile).pack(side="left")
 
         # 操作パネル: 2つのフレームを並べる
         body = ttk.Frame(self, padding=8)
@@ -127,6 +137,15 @@ class App(tk.Tk):
         )
         if p:
             self.folder_var.set(p)
+
+    def _on_browse_profile(self) -> None:
+        """issue #50: 用語集 TOML ファイルを選択する。"""
+        p = filedialog.askopenfilename(
+            title="用語集 TOML ファイルを選択",
+            filetypes=[("TOML ファイル", "*.toml"), ("すべてのファイル", "*.*")],
+        )
+        if p:
+            self.profile_var.set(p)
 
     def _get_folder(self) -> Path | None:
         """入力パスを返す。フォルダまたは PDF ファイル (issue #35)。"""
@@ -203,8 +222,10 @@ class App(tk.Tk):
         self._set_status("解析中…")
 
         def do():
-            # profile は CLI からのみ指定可能。GUI 用語集 UI は別 issue (#50) で対応予定。
-            return _analyze.run_analyze(folder)
+            # issue #50: profile_var に TOML パスが入っていれば run_analyze に渡す
+            profile_str = self.profile_var.get().strip()
+            profile = Path(profile_str) if profile_str else None
+            return _analyze.run_analyze(folder, profile=profile)
 
         def done(res):
             pages = res.get("pages", 0)

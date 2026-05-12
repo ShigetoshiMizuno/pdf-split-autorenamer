@@ -99,6 +99,24 @@ class TestAnalyzeParser:
         args = p.parse_args(["analyze", "./folder", "--quiet"])
         assert args.quiet is True
 
+    def test_analyze_profile_help_says_glossary(self):
+        """issue #50: analyze --profile の help 文言に「用語集」が含まれること"""
+        import io
+        p = build_parser()
+        buf = io.StringIO()
+        try:
+            p.parse_args(["analyze", "--help"])
+        except SystemExit:
+            pass
+        # argparse の help テキストを formatter から取得
+        formatter = p._subparsers._actions[-1].choices["analyze"]._get_formatter()
+        formatter.add_arguments(
+            p._subparsers._actions[-1].choices["analyze"]._option_string_actions.values()
+        )
+        help_text = formatter.format_help()
+        assert "用語集" in help_text, \
+            f"analyze --profile の help に「用語集」がない (issue #50): {help_text}"
+
 
 # ---------------------------------------------------------------------------
 # split サブコマンド
@@ -346,6 +364,45 @@ class TestCmdAnalyze:
              patch("builtins.input", return_value="n"):
             result = cmd_analyze(args)
         assert result == 1
+
+    def test_cmd_analyze_print_uses_user_friendly_terms(self, tmp_path, capsys):
+        """issue #50: cmd_analyze の print 出力に「編集画面」「分割設定」が含まれること
+
+        「report.html」「groups.json」といった内部用語を直接表示しないこと。
+        """
+        from pdf_split_autorenamer.cli import cmd_analyze
+        import argparse
+        args = argparse.Namespace(
+            folder=str(tmp_path),
+            work_dir=None,
+            pdftotext=None,
+            title="Test",
+            no_ocr_fallback=False,
+            ocr_strategy="balanced",
+            yes=False,
+            profile=None,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {
+            "pages": 3,
+            "groups": 2,
+            "report_html": str(tmp_path / "report.html"),
+            "groups_json": str(tmp_path / "groups.json"),
+        }
+        with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
+            cmd_analyze(args)
+        captured = capsys.readouterr()
+        # ユーザー向けラベルが使われていること（パス自体は含まれて良い）
+        assert "編集画面:" in captured.out, \
+            f"issue #50: 「編集画面:」ラベルが CLI 出力にない: {captured.out!r}"
+        assert "分割設定:" in captured.out, \
+            f"issue #50: 「分割設定:」ラベルが CLI 出力にない: {captured.out!r}"
+        # 「レポート:」「groups.json:」という内部用語ラベルが消えていること
+        assert "レポート:" not in captured.out, \
+            f"issue #50: 内部用語ラベル「レポート:」が CLI 出力に残っている: {captured.out!r}"
+        assert "groups.json:" not in captured.out, \
+            f"issue #50: 内部用語ラベル「groups.json:」が CLI 出力に残っている: {captured.out!r}"
 
 
 class TestCmdSplit:
@@ -747,3 +804,74 @@ class TestCmdRenameWithActions:
         captured = capsys.readouterr()
         assert "完了" in captured.out
         assert "1" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# issue #50: サブコマンド help に内部用語が含まれないこと
+# ---------------------------------------------------------------------------
+
+def _subcommand_help(cmd: str) -> str:
+    """指定サブコマンドの help 文字列を取得する"""
+    p = build_parser()
+    sub = p._subparsers._actions[-1].choices[cmd]
+    formatter = sub._get_formatter()
+    formatter.add_usage(sub.usage, sub._actions, sub._mutually_exclusive_groups)
+    formatter.add_text(sub.description)
+    for ag in sub._action_groups:
+        formatter.start_section(ag.title)
+        formatter.add_arguments(ag._group_actions)
+        formatter.end_section()
+    return formatter.format_help()
+
+
+def _top_help() -> str:
+    """psar --help のトップレベル help 文字列を取得する"""
+    p = build_parser()
+    formatter = p._get_formatter()
+    formatter.add_usage(p.usage, p._actions, p._mutually_exclusive_groups)
+    formatter.add_text(p.description)
+    for ag in p._action_groups:
+        formatter.start_section(ag.title)
+        formatter.add_arguments(ag._group_actions)
+        formatter.end_section()
+    return formatter.format_help()
+
+
+class TestSubcommandHelpNoInternalTerms:
+    """issue #50: ユーザーが見る help 文字列に内部用語が露出しないこと"""
+
+    def test_split_help_no_groups_json(self):
+        """split サブコマンド help に 'groups.json' が含まれないこと"""
+        help_text = _subcommand_help("split")
+        assert "groups.json" not in help_text, \
+            f"issue #50: split help に 'groups.json' が露出している: {help_text!r}"
+
+    def test_serve_help_no_report_html(self):
+        """serve サブコマンド help に 'report.html' が含まれないこと"""
+        help_text = _subcommand_help("serve")
+        assert "report.html" not in help_text, \
+            f"issue #50: serve help に 'report.html' が露出している: {help_text!r}"
+
+    def test_serve_help_no_groups_json(self):
+        """serve サブコマンド help に 'groups.json' が含まれないこと"""
+        help_text = _subcommand_help("serve")
+        assert "groups.json" not in help_text, \
+            f"issue #50: serve help に 'groups.json' が露出している: {help_text!r}"
+
+    def test_rename_profile_help_says_glossary(self):
+        """issue #50: rename --profile の help に「用語集」が含まれること（analyze と表記を揃える）"""
+        help_text = _subcommand_help("rename")
+        assert "用語集" in help_text, \
+            f"issue #50: rename --profile の help に「用語集」がない: {help_text!r}"
+
+    def test_top_level_split_description_no_groups_json(self):
+        """psar --help のサブコマンド一覧に 'groups.json' が含まれないこと"""
+        help_text = _top_help()
+        assert "groups.json" not in help_text, \
+            f"issue #50: トップ help に 'groups.json' が露出している: {help_text!r}"
+
+    def test_top_level_serve_description_no_report_html(self):
+        """psar --help のサブコマンド一覧に 'report.html' が含まれないこと"""
+        help_text = _top_help()
+        assert "report.html" not in help_text, \
+            f"issue #50: トップ help に 'report.html' が露出している: {help_text!r}"
