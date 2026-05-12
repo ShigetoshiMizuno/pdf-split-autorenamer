@@ -20,6 +20,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from . import analyze as _analyze
+from . import inapp_editor as _inapp
 from . import split as _split
 
 
@@ -66,22 +67,27 @@ class App(tk.Tk):
         body = ttk.Frame(self, padding=8)
         body.pack(fill="x")
 
-        # Step 1: 解析
-        f1 = ttk.LabelFrame(body, text="1. 解析（サムネ・HTMLレポート生成）", padding=8)
+        # Step 1: 解析（解析を実行 → 完了したら自動でアプリ内編集ウィンドウへ）
+        f1 = ttk.LabelFrame(body, text="1. 解析（PDFを読み込み、書類の境界を提案）", padding=8)
         f1.pack(fill="x", **pad)
         ttk.Button(f1, text="解析を実行", command=self._on_analyze).pack(side="left")
-        ttk.Button(f1, text="report.html をブラウザで開く",
-                   command=self._on_open_report).pack(side="left", padx=8)
-        ttk.Label(f1, text="HTMLで境界・出力名を編集 → groups.json を上書き保存").pack(
+        ttk.Label(f1,
+                  text="押すと内容を読み取り、続けて編集ウィンドウが開きます").pack(
             side="left", padx=12)
 
         # Step 2: 分割（編集ウィンドウで決めた候補名でそのまま書き出す）
         f2 = ttk.LabelFrame(body, text="2. 分割（編集した内容に従って書類ごとに切り出し）", padding=8)
         f2.pack(fill="x", **pad)
-        ttk.Button(f2, text="dry-run", command=lambda: self._on_split(False)).pack(side="left")
-        ttk.Button(f2, text="実行", command=lambda: self._on_split(True)).pack(side="left", padx=8)
-        ttk.Checkbutton(f2, text="既存ファイルを上書き (--force)",
+        ttk.Button(f2, text="実行", command=lambda: self._on_split(True)).pack(side="left")
+        ttk.Checkbutton(f2, text="既存ファイルを上書きする",
                         variable=self.force_var).pack(side="left", padx=12)
+        # 詳細オプション（折りたたみ）
+        self._split_advanced_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f2, text="詳細オプション", variable=self._split_advanced_var,
+                        command=self._toggle_split_advanced).pack(side="right")
+        self._split_advanced_frame = ttk.Frame(body)  # 折りたたみコンテンツ
+        ttk.Button(self._split_advanced_frame, text="変更内容を確認するだけ（実行しない）",
+                   command=lambda: self._on_split(False)).pack(side="left", padx=8)
 
         # ログエリア
         log_frame = ttk.LabelFrame(self, text="ログ", padding=4)
@@ -180,6 +186,14 @@ class App(tk.Tk):
         lines.append("実行してよろしいですか？")
         return "\n".join(lines)
 
+    # ----- 詳細オプション折りたたみ -----
+    def _toggle_split_advanced(self) -> None:
+        if self._split_advanced_var.get():
+            self._split_advanced_frame.pack(fill="x", padx=8, pady=(0, 4),
+                                            after=self._split_advanced_frame.master.winfo_children()[1])
+        else:
+            self._split_advanced_frame.pack_forget()
+
     # ----- アクション -----
     def _on_analyze(self) -> None:
         folder = self._get_folder()
@@ -210,7 +224,7 @@ class App(tk.Tk):
                 messagebox.showwarning(
                     "解析完了",
                     "書類グループを提案できませんでした。\n"
-                    "プロファイル設定をご確認ください。"
+                    "用語集の設定をご確認ください。"
                 )
                 return
             if not html:
@@ -221,8 +235,12 @@ class App(tk.Tk):
                 )
                 return
 
-            self._log(f"  report.html: {html}")
-            webbrowser.open(Path(html).as_uri())
+            self._log(f"  レポート: {html}")
+            # issue #37: 確認ダイアログなしで自動遷移。pywebview があればアプリ内、無ければブラウザ。
+            if _inapp.is_available():
+                self._on_inapp_edit()
+            else:
+                webbrowser.open(Path(html).as_uri())
 
         self._run_async(do, done)
 
@@ -235,6 +253,58 @@ class App(tk.Tk):
             messagebox.showwarning("警告", f"レポートが未生成です。先に「解析を実行」を押してください。\n{html}")
             return
         webbrowser.open(html.as_uri())
+
+    def _on_inapp_edit(self) -> None:
+        """pywebview を別プロセスで起動してアプリ内編集 UI を表示する。
+
+        Tk のメインループと pywebview の GUI ループが衝突するのを避けるため、
+        別プロセスで `python -m pdf_split_autorenamer.inapp_editor <work_dir>` を呼ぶ。
+        """
+        if not _inapp.is_available():
+            messagebox.showwarning(
+                "編集ウィンドウを開けません",
+                "アプリ内編集には pywebview のインストールが必要です。\n\n"
+                "  pip install 'pdf-split-autorenamer[gui-inapp]'\n\n"
+                "を実行してからアプリを再起動してください。"
+            )
+            return
+
+        folder = self._get_folder()
+        if not folder:
+            return
+        work_dir = folder / ".psar"
+        html = work_dir / "report.html"
+        if not html.exists():
+            messagebox.showwarning(
+                "解析が完了していません",
+                "先に「1. 解析 → 解析を実行」を押してください。"
+            )
+            return
+
+        self._log("=== 編集ウィンドウを開いています… ===")
+        self._set_status("編集ウィンドウを開いています…")
+
+        import subprocess
+
+        def runner():
+            try:
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "pdf_split_autorenamer.inapp_editor", str(work_dir)],
+                )
+                proc.wait()
+                return proc.returncode
+            except Exception as e:  # noqa: BLE001
+                return f"起動失敗: {e}"
+
+        def done(result):
+            if isinstance(result, int) and result == 0:
+                self._log("=== 編集ウィンドウを閉じました ===")
+                self._set_status("編集完了。続けて「2. 分割 → 実行」を押してください")
+            else:
+                self._log(f"=== 編集ウィンドウ 異常終了: {result} ===")
+                self._set_status("編集ウィンドウでエラー")
+
+        self._run_async(runner, done)
 
     def _on_split(self, apply_: bool) -> None:
         folder = self._get_folder()

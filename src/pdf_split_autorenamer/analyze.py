@@ -303,13 +303,21 @@ main{ max-width:1100px; margin:0 auto; padding:16px;}
 <header>
   <h1>__TITLE__</h1>
   <div class="stat" id="stat"></div>
-  <button onclick="saveJson()">groups.json を保存</button>
-  <button onclick="resetGroups()">初期境界に戻す</button>
+  <button onclick="saveJson()">分割設定を保存</button>
+  <button onclick="resetGroups()">自動提案に戻す</button>
 </header>
 <main id="main"></main>
 <script id="payload" type="application/json">__PAYLOAD__</script>
 <script>
-const payload = JSON.parse(atob(document.getElementById('payload').textContent.trim()));
+// atob() は Latin-1 として解釈するため、UTF-8 のマルチバイト文字（日本語）が
+// そのまま文字化けする。TextDecoder('utf-8') を経由して正しく復元する。
+function utf8atob(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+const payload = JSON.parse(utf8atob(document.getElementById('payload').textContent.trim()));
 const pages = payload.pages;
 const boundaries = payload.boundaries;
 const initial = payload.initial_groups;
@@ -494,7 +502,21 @@ function buildGroupsFromFlags() {
 function saveJson() {
   const data = buildGroupsFromFlags();
   const jsonStr = JSON.stringify(data, null, 2);
-  if (window.location.protocol === 'http:') {
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.save_groups) {
+    // pywebview アプリ内編集モード: bridge 経由で直接 .psar/groups.json に書き込み
+    window.pywebview.api.save_groups(jsonStr).then(r => {
+      if (r && r.ok) {
+        // issue #39: 保存成功時は無音。pywebview のブリッジ経由でウィンドウを閉じる。
+        if (window.pywebview.api.close_window) {
+          window.pywebview.api.close_window();
+        } else {
+          try { window.close(); } catch (e) { /* fallback */ }
+        }
+      } else {
+        alert('保存失敗: ディスクの空き容量を確認するか、アプリを再起動してください。\n（詳細: ' + (r && r.error ? r.error : '不明') + '）');
+      }
+    }).catch(e => alert('保存失敗: ' + e));
+  } else if (window.location.protocol === 'http:') {
     // psar serve モード: サーバーに直接保存
     fetch('/api/save-groups', {
       method: 'POST',
@@ -505,21 +527,21 @@ function saveJson() {
         // issue #39: 保存成功時は無音。タブを閉じられるなら閉じる。
         try { window.close(); } catch (e) { /* ブラウザがタブを閉じられない場合は黙る */ }
       } else {
-        r.text().then(t => alert('保存失敗: ' + t));
+        r.text().then(t => alert('保存に失敗しました。\n（詳細: ' + t + '）'));
       }
-    }).catch(e => alert('保存失敗: ' + e));
+    }).catch(e => alert('保存に失敗しました。\n（詳細: ' + e + '）'));
   } else {
-    // file:// プロトコル: 従来のダウンロード
+    // file:// プロトコル: 従来のダウンロード（フォールバック）
     const blob = new Blob([jsonStr], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'groups.json'; a.click();
     URL.revokeObjectURL(url);
-    alert('groups.json をダウンロードしました。\n作業ディレクトリ (.psar) に上書き保存してから\n分割を実行してください。');
+    alert('分割設定ファイル（groups.json）をダウンロードしました。\nダウンロードしたファイルを作業フォルダ (.psar) に移動してから\n本体の「2. 分割 → 実行」を押してください。');
   }
 }
 function resetGroups() {
-  if (!confirm('初期境界とファイル名を初期状態に戻します。よろしいですか?')) return;
+  if (!confirm('自動提案の分割位置とファイル名に戻します。よろしいですか？')) return;
   flags = buildInitialFlags();
   names = buildInitialNames();
   render();

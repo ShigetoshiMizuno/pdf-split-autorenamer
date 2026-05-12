@@ -82,13 +82,19 @@ psar gui
 python -m pdf_split_autorenamer gui
 ```
 
-3ステップを画面のボタンでぽちぽち進めます。
+アプリ内編集（pywebview）を使う場合は追加インストールが必要です:
 
-1. **PDFフォルダ** を選んで「解析を実行」 → ブラウザで `report.html` が開きます。
-2. ブラウザ上で各ページの **「↑つなぐ／↑切る」** をクリックして境界を調整。各グループの先頭で
-   **出力名** を入力できます（OCRから推定済みの候補が初期値）。
-3. 「**groups.json を保存**」ボタンでファイルをダウンロード → `<フォルダ>/.psar/groups.json` に上書き。
-4. GUI に戻って「**分割 実行**」 → 「**自動リネーム 実行**」。
+```sh
+pip install "pdf-split-autorenamer[gui-inapp]"
+```
+
+4ステップを画面のボタンでぽちぽち進めます。
+
+1. **PDFフォルダ** を選んで「解析を実行」 → 自動で編集画面が開きます。
+2. **「アプリ内で編集（推奨）」** ボタンで境界を調整・出力名を編集し、「分割設定を保存」で自動保存。
+   pywebview 未導入の場合はブラウザで `report.html` が開きます（旧フロー）。
+   ブラウザで「**groups.json を保存**」→ `<フォルダ>/.psar/groups.json` に手動で上書き。
+3. GUI に戻って「**分割 実行**」 → 「**自動リネーム 実行**」。
 
 ### CUI
 
@@ -203,6 +209,32 @@ pip install "pdf-split-autorenamer[paddle]"
 | `balanced` | Stage 1 → テキスト空時 Stage 2（既定） |
 | `roi` | Stage 1 → 品質低時 Stage 2（ROI クロップ） |
 | `llm` | Stage 1 → 2 → Claude LLM Vision の順に試行 |
+
+## 開発者向け: デモ PDF の再生成
+
+`docs/demo/sample_office_scan.pdf` を再生成するには [WeasyPrint](https://weasyprint.org/) と GTK3 Runtime が必要です。
+**通常の利用（既存のデモ PDF を見るだけ）には追加インストール不要**です。
+
+### セットアップ
+
+```sh
+# 1. WeasyPrint をインストール
+pip install "pdf-split-autorenamer[demo]"
+
+# 2. GTK3 Runtime をインストール
+#    Windows: winget install tschoonj.GTKForWindows
+#    Linux:   sudo apt install libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b
+#    macOS:   brew install pango
+```
+
+### 再生成
+
+```sh
+python scripts/generate_demo_pdf.py docs/demo/sample_office_scan.pdf
+```
+
+生成された PDF は `PyMuPDF.get_text()` で全 10 ページのテキストが抽出可能です。
+書類タイプ・日付を本文に含むため `psar analyze` → `psar rename` の動作確認に使えます。
 
 ## 注意
 

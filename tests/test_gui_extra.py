@@ -336,8 +336,8 @@ class TestOnAnalyze:
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
 
-    def test_analyze_done_with_html_opens_browser_without_dialog(self, tmp_path):
-        """issue #37: 正常解析時はダイアログなしで webbrowser.open が呼ばれる"""
+    def test_analyze_done_opens_browser_when_pywebview_unavailable(self, tmp_path):
+        """pywebview 未導入時: 正常解析でダイアログなしに webbrowser.open が呼ばれる (#37 + #30)"""
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
@@ -346,20 +346,38 @@ class TestOnAnalyze:
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module._inapp, "is_available", return_value=False), \
              patch.object(gui_module.messagebox, "askyesno") as masky, \
              patch.object(gui_module.messagebox, "showwarning") as msw, \
              patch.object(gui_module, "webbrowser") as mwb, \
              patch.object(app, "_run_async",
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
-        # 確認ダイアログは出さない
         masky.assert_not_called()
         msw.assert_not_called()
-        # ブラウザは自動で開く
         mwb.open.assert_called_once()
 
+    def test_analyze_done_invokes_inapp_edit_when_pywebview_available(self, tmp_path):
+        """pywebview 導入時: 正常解析でダイアログなしに _on_inapp_edit が呼ばれる (#37 + #30)"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        fake_html = str(tmp_path / "report.html")
+        mock_result = {"pages": 3, "groups": 2, "report_html": fake_html, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module._inapp, "is_available", return_value=True), \
+             patch.object(gui_module.messagebox, "askyesno") as masky, \
+             patch.object(app, "_on_inapp_edit") as m_edit, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        masky.assert_not_called()
+        m_edit.assert_called_once()
+
     def test_analyze_done_pages_zero_shows_warning(self, tmp_path):
-        """issue #37: pages == 0 → 警告ダイアログ、ブラウザは開かない"""
+        """issue #37: pages == 0 → 警告ダイアログ、ブラウザも編集も開かない"""
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
@@ -526,6 +544,34 @@ class TestOnSplit:
 
 # issue #40: _on_rename テスト群は廃止。GUI 自動リネームは Step 2 分割に統合された。
 # rename ロジック自体は CLI 用に残存し、tests/test_rename.py でカバーされる。
+
+
+# ---------------------------------------------------------------------------
+# _toggle_split_advanced  (Step 2 詳細オプション折りたたみ)
+# ---------------------------------------------------------------------------
+
+class TestToggleAdvanced:
+    def _make_app_with_advanced(self, split_checked: bool) -> object:
+        app = _make_app()
+        app.__dict__["_split_advanced_var"] = _BooleanVar(split_checked)
+        split_frame = MagicMock()
+        split_frame.master.winfo_children.return_value = [MagicMock(), MagicMock()]
+        app.__dict__["_split_advanced_frame"] = split_frame
+        return app
+
+    def test_toggle_split_advanced_pack_when_checked(self):
+        """split_advanced_var=True → pack が呼ばれる"""
+        app = self._make_app_with_advanced(split_checked=True)
+        app._toggle_split_advanced()
+        app._split_advanced_frame.pack.assert_called_once()
+        app._split_advanced_frame.pack_forget.assert_not_called()
+
+    def test_toggle_split_advanced_pack_forget_when_unchecked(self):
+        """split_advanced_var=False → pack_forget が呼ばれる"""
+        app = self._make_app_with_advanced(split_checked=False)
+        app._toggle_split_advanced()
+        app._split_advanced_frame.pack_forget.assert_called_once()
+        app._split_advanced_frame.pack.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
