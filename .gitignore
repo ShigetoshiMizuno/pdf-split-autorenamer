@@ -81,6 +81,9 @@ desktop.ini
 _*.txt
 _*.py
 !**/__main__.py
+# src/ 配下の private モジュール（_subprocess_utils.py 等）は誤除外しない
+!src/**/_*.py
+!tests/**/_*.py
 # ベンチマーク結果（生成ファイル）
 tests/fixtures/benchmark/results*.json
 
