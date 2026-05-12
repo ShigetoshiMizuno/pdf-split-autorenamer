@@ -63,6 +63,22 @@ def _make_app(folder: str = "") -> object:
 
 
 # ---------------------------------------------------------------------------
+# _format_display_name (issue #72)
+# ---------------------------------------------------------------------------
+
+class TestFormatDisplayName:
+    def test_returns_parent_slash_name_when_parent_exists(self):
+        """issue #72: 親ディレクトリ名 + ファイル名で識別性を高める"""
+        from pdf_split_autorenamer.gui import _format_display_name
+        assert _format_display_name(Path("/work/docs/a.pdf")) == "docs/a.pdf"
+
+    def test_returns_name_only_when_parent_is_empty(self):
+        """issue #72: 親ディレクトリ名が空（ルート直下等）のときはファイル名のみ"""
+        from pdf_split_autorenamer.gui import _format_display_name
+        assert _format_display_name(Path("a.pdf")) == "a.pdf"
+
+
+# ---------------------------------------------------------------------------
 # _TextHandler._append  (lines 37-38)
 # ---------------------------------------------------------------------------
 

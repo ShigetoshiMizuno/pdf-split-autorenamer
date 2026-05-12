@@ -32,6 +32,16 @@ except ImportError:
     _DND_AVAILABLE = False
 
 
+def _format_display_name(path: Path) -> str:
+    """issue #72: 複数選択時の代表表示名（親ディレクトリ名 + ファイル名）。
+
+    親ディレクトリ名が空のとき（ルート直下等）はファイル名のみ。
+    異なるディレクトリの同名ファイルの区別を可能にする。
+    """
+    parent_name = path.parent.name
+    return f"{parent_name}/{path.name}" if parent_name else path.name
+
+
 class _TextHandler(logging.Handler):
     """logging のメッセージを Tkinter の Text ウィジェットに転送するハンドラ"""
 
@@ -176,7 +186,7 @@ class App(_BaseApp):
         else:
             # 複数パス（PDF・フォルダ混在も含む、B 案警告に委ねる）
             self._input_paths = paths
-            first = paths[0].name
+            first = _format_display_name(paths[0])
             self.folder_var.set(f"({len(paths)} ファイル) {first} 他 {len(paths) - 1} 件")
 
     # ----- イベント -----
@@ -209,7 +219,7 @@ class App(_BaseApp):
         if len(pdf_paths) == 1:
             self.folder_var.set(str(pdf_paths[0]))
         else:
-            first = pdf_paths[0].name
+            first = _format_display_name(pdf_paths[0])
             self.folder_var.set(f"({len(pdf_paths)} ファイル) {first} 他 {len(pdf_paths) - 1} 件")
 
     def _on_browse_file(self) -> None:
