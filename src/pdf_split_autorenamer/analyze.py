@@ -626,7 +626,7 @@ def run_analyze(src_dir: Path | list[Path], work_dir: Path | None = None,
     src_dir として扱い、対象 PDF を 1 件だけにフィルタする。
 
     issue #48: src_dir が list[Path] の場合は、指定された PDF ファイルのみを処理する。
-    共通の親ディレクトリを src_dir として使用する。
+    先頭 PDF の親ディレクトリを src_dir として使用する（issue #59 でコメント表現修正）。
     """
     # issue #48: list[Path] の処理
     explicit_pdf_names: set[str] | None = None
@@ -635,7 +635,7 @@ def run_analyze(src_dir: Path | list[Path], work_dir: Path | None = None,
         pdf_paths = [Path(p) for p in src_dir]
         if not pdf_paths:
             return {"pages": 0, "groups": 0}
-        # 共通親ディレクトリを src_dir として使用
+        # 先頭 PDF の親ディレクトリを src_dir として使用（issue #59）
         src_dir = pdf_paths[0].parent
         explicit_pdf_names = {p.name for p in pdf_paths}
     else:
