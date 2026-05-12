@@ -502,7 +502,8 @@ function saveJson() {
       body: jsonStr
     }).then(r => {
       if (r.ok) {
-        alert('groups.json を保存しました。\n分割を実行するには psar split を実行してください。');
+        // issue #39: 保存成功時は無音。タブを閉じられるなら閉じる。
+        try { window.close(); } catch (e) { /* ブラウザがタブを閉じられない場合は黙る */ }
       } else {
         r.text().then(t => alert('保存失敗: ' + t));
       }

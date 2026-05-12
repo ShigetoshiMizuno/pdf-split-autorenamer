@@ -362,6 +362,36 @@ class TestHtmlTemplateSaveJson:
         assert "application/json" in HTML_TEMPLATE, \
             "Content-Type: application/json が HTML_TEMPLATE にない"
 
+    def test_no_success_alert_in_http_save(self):
+        """issue #39: http モード保存成功時の確認アラートを廃止する"""
+        # 旧仕様の文字列は HTML_TEMPLATE に含まれてはならない
+        assert "groups.json を保存しました" not in HTML_TEMPLATE, (
+            "http モード保存成功時の確認アラートが残っている (issue #39)"
+        )
+
+    def test_failure_alert_remains(self):
+        """issue #39: 失敗時のアラートは残す"""
+        assert "保存失敗" in HTML_TEMPLATE, (
+            "保存失敗時のアラートが消えている (失敗通知は必要)"
+        )
+
+    def test_http_save_closes_window_or_silent(self):
+        """issue #39: http 保存成功時は window.close() を試みるか、何もしない（無音）。
+
+        「ダイアログを出して案内」を止めるため、成功分岐に成功通知用 alert（'を保存しました'等）が
+        含まれないことを確認する。失敗側の alert は対象外。
+        """
+        # 保存成功通知用のフレーズが含まれないこと
+        forbidden_phrases = [
+            "保存しました",
+            "保存完了",
+            "save complete",
+        ]
+        for phrase in forbidden_phrases:
+            assert phrase not in HTML_TEMPLATE, (
+                f"保存成功通知の文言 '{phrase}' が残っている (issue #39)"
+            )
+
 
 # ---------------------------------------------------------------------------
 # build_boundary_info
