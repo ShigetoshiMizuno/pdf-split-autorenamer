@@ -148,7 +148,7 @@ def _get_version() -> str:
         from importlib.metadata import version
         return version("pdf-split-autorenamer")
     except Exception:
-        return "0.3.0"
+        return "0.4.0"
 
 
 def build_parser() -> argparse.ArgumentParser:
