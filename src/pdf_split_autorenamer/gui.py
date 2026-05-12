@@ -185,7 +185,7 @@ class App(tk.Tk):
             return result[0]
         return result
 
-    def _get_inputs(self) -> "Path | list[Path] | None":
+    def _get_inputs(self) -> Path | list[Path] | None:
         """issue #48: 入力を返す。
 
         - フォルダ: Path（ディレクトリ）
