@@ -537,8 +537,18 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
                 ocr_fallback: bool = True,
                 ocr_strategy: str = "balanced") -> dict:
     """src_dir 配下のPDFを解析し、サムネ・groups.json・report.html を work_dir に出力。
-    既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。"""
-    src_dir = Path(src_dir)
+    既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。
+
+    issue #35: src_dir が PDF ファイル単体を指している場合は、その親ディレクトリを
+    src_dir として扱い、対象 PDF を 1 件だけにフィルタする。
+    """
+    src_path = Path(src_dir)
+    single_pdf_name: str | None = None
+    if src_path.is_file() and src_path.suffix.lower() == ".pdf":
+        single_pdf_name = src_path.name
+        src_dir = src_path.parent
+    else:
+        src_dir = src_path
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     thumb_dir = work_dir / "thumbs"
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -549,6 +559,9 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
     def _filter(p: Path) -> bool:
         # 出力済みっぽい (`<stem>_NN[_name].pdf`) は対象外
         if split_re.search(p.name):
+            return False
+        # 単一 PDF モードでは対象ファイルだけ通す
+        if single_pdf_name is not None and p.name != single_pdf_name:
             return False
         return True
 

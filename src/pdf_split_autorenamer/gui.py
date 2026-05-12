@@ -56,10 +56,11 @@ class App(tk.Tk):
 
         top = ttk.Frame(self, padding=8)
         top.pack(fill="x")
-        ttk.Label(top, text="PDFフォルダ:").pack(side="left")
+        ttk.Label(top, text="PDFフォルダ／ファイル:").pack(side="left")
         ent = ttk.Entry(top, textvariable=self.folder_var)
         ent.pack(side="left", fill="x", expand=True, padx=(6, 6))
-        ttk.Button(top, text="参照…", command=self._on_browse).pack(side="left")
+        ttk.Button(top, text="フォルダ…", command=self._on_browse).pack(side="left")
+        ttk.Button(top, text="ファイル…", command=self._on_browse_file).pack(side="left", padx=(4, 0))
 
         # 操作パネル: 2つのフレームを並べる
         body = ttk.Frame(self, padding=8)
@@ -108,16 +109,36 @@ class App(tk.Tk):
         if d:
             self.folder_var.set(d)
 
+    def _on_browse_file(self) -> None:
+        """issue #35: 単一 PDF ファイルを選択可能にする。"""
+        initial = self.folder_var.get() or "."
+        if Path(initial).is_file():
+            initial = str(Path(initial).parent)
+        p = filedialog.askopenfilename(
+            title="PDF ファイルを選択",
+            initialdir=initial,
+            filetypes=[("PDF ファイル", "*.pdf"), ("すべてのファイル", "*.*")],
+        )
+        if p:
+            self.folder_var.set(p)
+
     def _get_folder(self) -> Path | None:
+        """入力パスを返す。フォルダまたは PDF ファイル (issue #35)。"""
         v = self.folder_var.get().strip()
         if not v:
-            messagebox.showwarning("警告", "PDFフォルダを選択してください。")
+            messagebox.showwarning(
+                "警告", "PDFフォルダまたは PDF ファイルを選択してください。"
+            )
             return None
         p = Path(v)
-        if not p.is_dir():
-            messagebox.showerror("エラー", f"フォルダが存在しません: {p}")
-            return None
-        return p
+        if p.is_dir():
+            return p
+        if p.is_file() and p.suffix.lower() == ".pdf":
+            return p
+        messagebox.showerror(
+            "エラー", f"フォルダまたは PDF ファイルが存在しません: {p}"
+        )
+        return None
 
     def _log(self, msg: str) -> None:
         self.log.insert("end", msg + "\n")
