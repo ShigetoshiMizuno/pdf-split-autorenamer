@@ -191,7 +191,10 @@ class TestOnDropNonPdf:
              patch.object(gui_module.messagebox, "showerror") as mock_err:
             app._on_drop(event)
 
-        mock_err.assert_called_once()
+        mock_err.assert_called_once_with(
+            "エラー",
+            "PDF ファイルまたはフォルダをドロップしてください: readme.txt",
+        )
         assert app._input_paths == original_paths
         assert app.folder_var.get() == original_folder
 
