@@ -228,16 +228,37 @@ class App(tk.Tk):
             return _analyze.run_analyze(folder)
 
         def done(res):
-            self._log(f"  ページ数: {res.get('pages', 0)}")
-            self._log(f"  初期グループ数: {res.get('groups', 0)}")
+            pages = res.get("pages", 0)
+            groups = res.get("groups", 0)
             html = res.get("report_html")
-            if html:
-                self._log(f"  report.html: {html}")
-                if messagebox.askyesno("解析完了",
-                                       f"ページ {res.get('pages')}, グループ {res.get('groups')} を提案しました。\n"
-                                       "ブラウザで report.html を開きますか?"):
-                    webbrowser.open(Path(html).as_uri())
+            self._log(f"  ページ数: {pages}")
+            self._log(f"  初期グループ数: {groups}")
             self._set_status("解析完了")
+
+            if pages == 0:
+                messagebox.showwarning(
+                    "解析完了",
+                    "PDF からテキストを取得できませんでした。\n"
+                    "OCR バックエンドの設定または PDF 内容をご確認ください。"
+                )
+                return
+            if groups == 0:
+                messagebox.showwarning(
+                    "解析完了",
+                    "書類グループを提案できませんでした。\n"
+                    "プロファイル設定をご確認ください。"
+                )
+                return
+            if not html:
+                messagebox.showwarning(
+                    "解析完了",
+                    "レポートが生成されませんでした。\n"
+                    "ログを確認してください。"
+                )
+                return
+
+            self._log(f"  report.html: {html}")
+            webbrowser.open(Path(html).as_uri())
 
         self._run_async(do, done)
 
