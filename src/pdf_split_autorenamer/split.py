@@ -55,8 +55,15 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
 
     出力: src_dir 直下 `<stem>_NN[_name].pdf`
     既存ファイルは force=False のときスキップ。
+
+    issue #35: src_dir が PDF ファイル単体を指している場合はその親ディレクトリを
+    src_dir として扱う（work_dir は親/.psar）。
     """
-    src_dir = Path(src_dir)
+    src_path = Path(src_dir)
+    if src_path.is_file() and src_path.suffix.lower() == ".pdf":
+        src_dir = src_path.parent
+    else:
+        src_dir = src_path
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     groups_path = work_dir / "groups.json"
     if not groups_path.exists():

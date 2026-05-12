@@ -148,6 +148,8 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                     "title_markers": list(TITLE_MARKER_RE.findall(
                         "\n".join(text.splitlines()[:5]))),
                     "bigram": _bigram(text),
+                    # issue #38: 書類タイプを格納し、境界判定に活用する
+                    "kind": textops.extract_kind(text),
                 })
         finally:
             doc.close()
@@ -178,6 +180,13 @@ def score_boundary(prev: dict, cur: dict) -> tuple[float, list[str]]:
     if new_titles:
         score += 0.5
         reasons.append("新タイトル " + ", ".join(list(new_titles)[:2]))
+    # issue #38: 書類タイプの変化を強い境界として扱う。
+    # "書類" (デフォルト/フォールバック) は「タイプ不明」を意味するため除外する。
+    prev_kind = prev.get("kind", "書類")
+    cur_kind = cur.get("kind", "書類")
+    if prev_kind != cur_kind and prev_kind != "書類" and cur_kind != "書類":
+        score += 0.8
+        reasons.append(f"書類タイプ変化 {prev_kind} → {cur_kind}")
     if not reasons:
         reasons.append(f"類似 (j={j:.2f})")
     return min(score, 1.0), reasons
@@ -497,11 +506,16 @@ function saveJson() {
     // pywebview アプリ内編集モード: bridge 経由で直接 .psar/groups.json に書き込み
     window.pywebview.api.save_groups(jsonStr).then(r => {
       if (r && r.ok) {
-        alert('分割設定を保存しました。\nこのウィンドウを閉じて、本体の「2. 分割 → 実行」を押してください。');
+        // issue #39: 保存成功時は無音。pywebview のブリッジ経由でウィンドウを閉じる。
+        if (window.pywebview.api.close_window) {
+          window.pywebview.api.close_window();
+        } else {
+          try { window.close(); } catch (e) { /* fallback */ }
+        }
       } else {
-        alert('保存に失敗しました。\nディスクの空き容量を確認するか、アプリを再起動してください。\n（詳細: ' + (r && r.error ? r.error : '不明') + '）');
+        alert('保存失敗: ディスクの空き容量を確認するか、アプリを再起動してください。\n（詳細: ' + (r && r.error ? r.error : '不明') + '）');
       }
-    }).catch(e => alert('保存に失敗しました。\n（詳細: ' + e + '）'));
+    }).catch(e => alert('保存失敗: ' + e));
   } else if (window.location.protocol === 'http:') {
     // psar serve モード: サーバーに直接保存
     fetch('/api/save-groups', {
@@ -510,7 +524,8 @@ function saveJson() {
       body: jsonStr
     }).then(r => {
       if (r.ok) {
-        alert('分割設定を保存しました。\n本体の「2. 分割 → 実行」を押してください。');
+        // issue #39: 保存成功時は無音。タブを閉じられるなら閉じる。
+        try { window.close(); } catch (e) { /* ブラウザがタブを閉じられない場合は黙る */ }
       } else {
         r.text().then(t => alert('保存に失敗しました。\n（詳細: ' + t + '）'));
       }
@@ -544,8 +559,18 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
                 ocr_fallback: bool = True,
                 ocr_strategy: str = "balanced") -> dict:
     """src_dir 配下のPDFを解析し、サムネ・groups.json・report.html を work_dir に出力。
-    既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。"""
-    src_dir = Path(src_dir)
+    既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。
+
+    issue #35: src_dir が PDF ファイル単体を指している場合は、その親ディレクトリを
+    src_dir として扱い、対象 PDF を 1 件だけにフィルタする。
+    """
+    src_path = Path(src_dir)
+    single_pdf_name: str | None = None
+    if src_path.is_file() and src_path.suffix.lower() == ".pdf":
+        single_pdf_name = src_path.name
+        src_dir = src_path.parent
+    else:
+        src_dir = src_path
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     thumb_dir = work_dir / "thumbs"
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -556,6 +581,9 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
     def _filter(p: Path) -> bool:
         # 出力済みっぽい (`<stem>_NN[_name].pdf`) は対象外
         if split_re.search(p.name):
+            return False
+        # 単一 PDF モードでは対象ファイルだけ通す
+        if single_pdf_name is not None and p.name != single_pdf_name:
             return False
         return True
 

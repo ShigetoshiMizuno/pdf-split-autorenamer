@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" font-family="'Segoe UI','Yu Gothic UI','Noto Sans JP',sans-serif">
+  <defs>
+    <filter id="ds" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.18"/>
+    </filter>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- ウィンドウ枠 (Tkinter on Windows) -->
+  <g filter="url(#ds)">
+    <rect x="20" y="20" width="720" height="32" fill="#ffffff" stroke="#a0a0a0"/>
+    <text x="36" y="40" font-size="13" fill="#1f1f1f">pdf-split-autorenamer</text>
+    <text x="676" y="40" font-size="14" fill="#3f3f3f">─</text>
+    <text x="694" y="40" font-size="12" fill="#3f3f3f">▢</text>
+    <rect x="710" y="20" width="30" height="32" fill="#e81123"/>
+    <text x="725" y="40" text-anchor="middle" font-size="12" fill="#ffffff">×</text>
+    <rect x="20" y="52" width="720" height="248" fill="#f0f0f0" stroke="#a0a0a0"/>
+  </g>
+
+  <!-- フォルダ選択行 -->
+  <text x="34" y="80" font-size="12" fill="#1f1f1f">PDFフォルダ:</text>
+  <rect x="120" y="68" width="490" height="20" fill="#ffffff" stroke="#7a7a7a"/>
+  <text x="126" y="83" font-size="11" fill="#1f1f1f">L:¥work¥scan_2026_04¥</text>
+  <rect x="618" y="66" width="60" height="24" fill="#e1e1e1" stroke="#7a7a7a"/>
+  <text x="648" y="82" text-anchor="middle" font-size="12" fill="#1f1f1f">参照…</text>
+
+  <!-- Step 1 LabelFrame: ハイライトされた状態 -->
+  <g>
+    <rect x="34" y="110" width="690" height="60" fill="#fffbeb" stroke="#f59e0b" stroke-width="2"/>
+    <rect x="48" y="104" width="280" height="12" fill="#fffbeb"/>
+    <text x="52" y="115" font-size="11" font-weight="600" fill="#92400e">1. 解析（サムネ・HTMLレポート生成）</text>
+
+    <!-- 「解析を実行」ボタン: パルス強調 -->
+    <g filter="url(#glow)">
+      <rect x="48" y="128" width="100" height="28" fill="#2563eb" stroke="#1d4ed8" stroke-width="2"/>
+      <text x="98" y="146" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">解析を実行</text>
+    </g>
+
+    <rect x="158" y="128" width="200" height="28" fill="#e1e1e1" stroke="#7a7a7a"/>
+    <text x="258" y="146" text-anchor="middle" font-size="12" fill="#1f1f1f">report.html をブラウザで開く</text>
+
+    <text x="376" y="146" font-size="11" fill="#3f3f3f">HTMLで境界・出力名を編集 → groups.json を上書き保存</text>
+  </g>
+
+  <!-- 吹き出し: 「ここを押す！」 -->
+  <g>
+    <path d="M 200 200 L 180 175 L 220 175 Z" fill="#ef4444"/>
+    <rect x="115" y="200" width="170" height="40" rx="8" fill="#ef4444"/>
+    <text x="200" y="217" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">まずここをクリック</text>
+    <text x="200" y="232" text-anchor="middle" font-size="10" fill="#fee2e2">PDFフォルダを解析します</text>
+  </g>
+
+  <!-- Step 2-3: グレーアウト -->
+  <g opacity="0.35">
+    <rect x="34" y="186" width="220" height="40" fill="#f0f0f0" stroke="#9c9c9c"/>
+    <text x="52" y="207" font-size="10" fill="#1f1f1f">2. 分割</text>
+    <rect x="304" y="186" width="420" height="40" fill="#f0f0f0" stroke="#9c9c9c"/>
+    <text x="322" y="207" font-size="10" fill="#1f1f1f">3. 自動リネーム</text>
+  </g>
+
+  <!-- ログ -->
+  <g opacity="0.7">
+    <rect x="34" y="246" width="690" height="48" fill="#ffffff" stroke="#9c9c9c"/>
+    <text x="44" y="266" font-size="10" fill="#1f1f1f" font-family="Consolas,monospace">[INFO] フォルダを選択しました: L:¥work¥scan_2026_04¥</text>
+    <text x="44" y="282" font-size="10" fill="#3f3f3f" font-family="Consolas,monospace">[INFO] 「解析を実行」ボタンを押すと、サムネ・OCR本文・境界候補を集めて report.html を生成します</text>
+  </g>
+</svg>
