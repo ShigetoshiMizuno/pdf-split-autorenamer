@@ -107,7 +107,8 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
                 continue
             name_part = sanitize_filename(it.get("name", ""))
             if name_part:
-                out_name = f"{src.stem}_{idx:02d}_{name_part}.pdf"
+                # issue #52: 候補名が決まっているときは元 PDF 名・連番を省く
+                out_name = f"{name_part}.pdf"
             else:
                 out_name = f"{src.stem}_{idx:02d}.pdf"
             out_path = src_dir / out_name
