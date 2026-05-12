@@ -34,10 +34,15 @@ def test_run_silent_passes_kwargs_through():
 
 
 def test_build_no_window_kwargs_windows():
-    """sys.platform == 'win32' のとき creationflags=CREATE_NO_WINDOW を返す。"""
+    """sys.platform == 'win32' のとき creationflags=CREATE_NO_WINDOW を返す。
+
+    Linux 環境では subprocess.CREATE_NO_WINDOW 属性がないため、
+    モジュール内のフォールバック定数値 (0x08000000) で比較する。
+    """
+    expected_flags = getattr(subprocess, "CREATE_NO_WINDOW", _subprocess_utils._CREATE_NO_WINDOW)
     with patch.object(_subprocess_utils.sys, "platform", "win32"):
         kwargs = _subprocess_utils._build_no_window_kwargs()
-        assert kwargs == {"creationflags": subprocess.CREATE_NO_WINDOW}
+        assert kwargs == {"creationflags": expected_flags}
 
 
 def test_build_no_window_kwargs_linux():

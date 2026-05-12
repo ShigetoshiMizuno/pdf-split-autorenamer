@@ -14,9 +14,13 @@ import sys
 from typing import Any
 
 
+_CREATE_NO_WINDOW = 0x08000000  # Windows: subprocess.CREATE_NO_WINDOW の値（非 Windows でも参照可）
+
+
 def _build_no_window_kwargs() -> dict[str, Any]:
     if sys.platform == "win32":
-        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", _CREATE_NO_WINDOW)
+        return {"creationflags": flags}
     return {}
 
 
