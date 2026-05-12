@@ -2,19 +2,19 @@
 """gui.py の追加カバレッジテスト（Tkinter を最大限モック）
 
 対象:
-- _TextHandler._append (lines 37-38)
-- App._build_ui (lines 56-128)
-- App._on_browse (lines 133-136)
-- App._get_folder (lines 147-155)
-- App._log / _set_status (lines 158-164)
-- App._run_async (lines 167-176)
-- App._build_split_summary / _build_rename_summary (static, lines 181-214)
-- App._on_analyze early return (lines 221-242)
-- App._on_open_report (lines 245-252)
-- App._on_split early return (lines 255-257)
-- App._on_rename early return (line 313) + done closures (329-330, 349-363)
-- main (lines 369-371)
-- __main__ guard (line 375)
+- _TextHandler._append
+- App._build_ui
+- App._on_browse / _get_folder
+- App._log / _set_status / _run_async
+- App._build_split_summary (static)
+- App._on_analyze early return
+- App._on_open_report
+- App._on_split early return
+- main / __main__ guard
+
+issue #40: Step 3 「自動リネーム」を Step 2 分割に統合したため、
+_on_rename / _build_rename_summary / _on_browse_profile / profile_var /
+rename_mode_var 関連のテストは削除。
 """
 from __future__ import annotations
 
@@ -53,9 +53,7 @@ def _make_app(folder: str = "") -> object:
         app = gui_module.App()
     app.__dict__.update({
         "folder_var": _StringVar(folder),
-        "rename_mode_var": _StringVar("split"),
         "force_var": _BooleanVar(False),
-        "profile_var": _StringVar(""),
         "status_var": _StringVar("待機中"),
         "log": MagicMock(),
     })
@@ -90,6 +88,27 @@ class TestBuildUi:
              patch.object(gui_module, "tk", MagicMock()), \
              patch("logging.getLogger", return_value=MagicMock()):
             app._build_ui()
+
+
+# ---------------------------------------------------------------------------
+# App.__init__  (Tk 実体生成までモックして、属性初期化と _build_ui 呼び出しをカバー)
+# ---------------------------------------------------------------------------
+
+class TestAppInit:
+    def test_init_creates_state_vars(self):
+        """App.__init__ が title/geometry/minsize/folder_var/force_var を初期化し _build_ui を呼ぶ"""
+        from pdf_split_autorenamer import gui as gui_module
+        with patch.object(gui_module.tk.Tk, "__init__", return_value=None), \
+             patch.object(gui_module.App, "title"), \
+             patch.object(gui_module.App, "geometry"), \
+             patch.object(gui_module.App, "minsize"), \
+             patch.object(gui_module.App, "_build_ui") as mb_ui, \
+             patch.object(gui_module, "tk", MagicMock(StringVar=MagicMock, BooleanVar=MagicMock)):
+            app = gui_module.App(initial_folder="/tmp")
+        mb_ui.assert_called_once()
+        # folder_var / force_var が設定されている
+        assert hasattr(app, "folder_var")
+        assert hasattr(app, "force_var")
 
 
 # ---------------------------------------------------------------------------
@@ -244,40 +263,12 @@ class TestBuildSplitSummary:
         assert "実行してよろしいですか" in s
 
 
-class TestBuildRenameSummary:
-    def test_basic_output(self):
-        from pdf_split_autorenamer.gui import App
-        res = {
-            "targets": 2,
-            "actions": [{"status": "dry-run", "src": "old.pdf", "src_display": "old.pdf",
-                          "dst": "2026-04-06_週報.pdf", "date": "2026-04-06", "kind": "週報"}],
-        }
-        s = App._build_rename_summary(res, "split")
-        assert "2 件" in s
-        assert "old.pdf" in s
-
-    def test_skip_status(self):
-        from pdf_split_autorenamer.gui import App
-        res = {
-            "targets": 1,
-            "actions": [{"status": "skip", "src": "old.pdf", "src_display": "old.pdf",
-                          "dst": "new.pdf", "date": "2026-04-06", "kind": "週報"}],
-        }
-        s = App._build_rename_summary(res, "split")
-        assert "skip" in s
-        assert "既存ファイルあり" in s
-
-    def test_truncates_long_list(self):
-        from pdf_split_autorenamer.gui import App
-        actions = [{"status": "dry-run", "src": f"f{i}.pdf", "src_display": f"f{i}.pdf",
-                    "dst": f"d{i}.pdf", "date": None, "kind": "書類"} for i in range(15)]
-        res = {"targets": 15, "actions": actions}
-        s = App._build_rename_summary(res, "split")
-        assert "他 5 件" in s
+# issue #40: TestBuildRenameSummary は Step 3 自動リネーム削除に伴い廃止。
+# rename ロジック自体は CLI 用に残存し、tests/test_rename.py でカバーされる。
 
 
 # ---------------------------------------------------------------------------
-# _on_analyze early return  (line 222-223)
+# _on_analyze early return
 # ---------------------------------------------------------------------------
 
 class TestOnAnalyze:
@@ -490,65 +481,12 @@ class TestOnSplit:
         assert "キャンセル" in statuses
 
 
-# ---------------------------------------------------------------------------
-# _on_rename early return (line 313) + done closures (lines 329-330, 349-363)
-# ---------------------------------------------------------------------------
-
-class TestOnRenameExtra:
-    def test_early_return_when_no_folder(self):
-        """folder が None なら即 return (line 313)"""
-        from pdf_split_autorenamer import gui as gui_module
-        app = _make_app()
-        with patch.object(app, "_get_folder", return_value=None), \
-             patch.object(app, "_run_async") as mra:
-            app._on_rename(apply_=False)
-        mra.assert_not_called()
-
-    def test_done_dry_logs_actions(self, tmp_path):
-        """done_dry コールバックがアクションをログに出力する (lines 327-331)"""
-        from pdf_split_autorenamer import gui as gui_module
-        app = _make_app(str(tmp_path))
-        logged = []
-        mock_result = {
-            "targets": 1,
-            "actions": [{"status": "dry-run", "src": "scan_01.pdf",
-                          "src_display": "scan_01.pdf",
-                          "dst": "2026-04-06_書類.pdf", "date": "2026-04-06", "kind": "書類"}],
-            "applied": 0,
-        }
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
-             patch.object(gui_module._rename, "run_rename", return_value=mock_result), \
-             patch.object(app, "_log", side_effect=logged.append), \
-             patch.object(app, "_set_status"), \
-             patch.object(app, "_run_async",
-                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
-            app._on_rename(apply_=False)
-        assert any("scan_01.pdf" in m for m in logged)
-
-    def test_done_apply_logs_results(self, tmp_path):
-        """done_apply コールバックが完了件数をログに出力する (lines 349-363)"""
-        from pdf_split_autorenamer import gui as gui_module
-        app = _make_app(str(tmp_path))
-        logged = []
-        mock_result = {
-            "targets": 1,
-            "actions": [{"status": "ok", "src": "scan_01.pdf", "src_display": "scan_01.pdf",
-                          "dst": "2026-04-06_書類.pdf", "date": "2026-04-06", "kind": "書類"}],
-            "applied": 1,
-        }
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
-             patch.object(gui_module._rename, "run_rename", return_value=mock_result), \
-             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
-             patch.object(app, "_log", side_effect=logged.append), \
-             patch.object(app, "_set_status"), \
-             patch.object(app, "_run_async",
-                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
-            app._on_rename(apply_=True)
-        assert any("1 件" in m for m in logged)
+# issue #40: _on_rename テスト群は廃止。GUI 自動リネームは Step 2 分割に統合された。
+# rename ロジック自体は CLI 用に残存し、tests/test_rename.py でカバーされる。
 
 
 # ---------------------------------------------------------------------------
-# main (lines 369-371) + __main__ guard (line 375)
+# main + __main__ guard
 # ---------------------------------------------------------------------------
 
 class TestMain:
