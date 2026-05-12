@@ -804,3 +804,74 @@ class TestCmdRenameWithActions:
         captured = capsys.readouterr()
         assert "完了" in captured.out
         assert "1" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# issue #50: サブコマンド help に内部用語が含まれないこと
+# ---------------------------------------------------------------------------
+
+def _subcommand_help(cmd: str) -> str:
+    """指定サブコマンドの help 文字列を取得する"""
+    p = build_parser()
+    sub = p._subparsers._actions[-1].choices[cmd]
+    formatter = sub._get_formatter()
+    formatter.add_usage(sub.usage, sub._actions, sub._mutually_exclusive_groups)
+    formatter.add_text(sub.description)
+    for ag in sub._action_groups:
+        formatter.start_section(ag.title)
+        formatter.add_arguments(ag._group_actions)
+        formatter.end_section()
+    return formatter.format_help()
+
+
+def _top_help() -> str:
+    """psar --help のトップレベル help 文字列を取得する"""
+    p = build_parser()
+    formatter = p._get_formatter()
+    formatter.add_usage(p.usage, p._actions, p._mutually_exclusive_groups)
+    formatter.add_text(p.description)
+    for ag in p._action_groups:
+        formatter.start_section(ag.title)
+        formatter.add_arguments(ag._group_actions)
+        formatter.end_section()
+    return formatter.format_help()
+
+
+class TestSubcommandHelpNoInternalTerms:
+    """issue #50: ユーザーが見る help 文字列に内部用語が露出しないこと"""
+
+    def test_split_help_no_groups_json(self):
+        """split サブコマンド help に 'groups.json' が含まれないこと"""
+        help_text = _subcommand_help("split")
+        assert "groups.json" not in help_text, \
+            f"issue #50: split help に 'groups.json' が露出している: {help_text!r}"
+
+    def test_serve_help_no_report_html(self):
+        """serve サブコマンド help に 'report.html' が含まれないこと"""
+        help_text = _subcommand_help("serve")
+        assert "report.html" not in help_text, \
+            f"issue #50: serve help に 'report.html' が露出している: {help_text!r}"
+
+    def test_serve_help_no_groups_json(self):
+        """serve サブコマンド help に 'groups.json' が含まれないこと"""
+        help_text = _subcommand_help("serve")
+        assert "groups.json" not in help_text, \
+            f"issue #50: serve help に 'groups.json' が露出している: {help_text!r}"
+
+    def test_rename_profile_help_says_glossary(self):
+        """issue #50: rename --profile の help に「用語集」が含まれること（analyze と表記を揃える）"""
+        help_text = _subcommand_help("rename")
+        assert "用語集" in help_text, \
+            f"issue #50: rename --profile の help に「用語集」がない: {help_text!r}"
+
+    def test_top_level_split_description_no_groups_json(self):
+        """psar --help のサブコマンド一覧に 'groups.json' が含まれないこと"""
+        help_text = _top_help()
+        assert "groups.json" not in help_text, \
+            f"issue #50: トップ help に 'groups.json' が露出している: {help_text!r}"
+
+    def test_top_level_serve_description_no_report_html(self):
+        """psar --help のサブコマンド一覧に 'report.html' が含まれないこと"""
+        help_text = _top_help()
+        assert "report.html" not in help_text, \
+            f"issue #50: トップ help に 'report.html' が露出している: {help_text!r}"
