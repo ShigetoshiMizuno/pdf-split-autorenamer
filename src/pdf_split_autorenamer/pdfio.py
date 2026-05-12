@@ -6,12 +6,13 @@ import hashlib
 import logging
 import os
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Iterator
 
 import fitz  # PyMuPDF
+
+from ._subprocess_utils import run_silent
 
 
 def find_tesseract() -> str | None:
@@ -58,7 +59,7 @@ def extract_text_tesseract(image_bytes: bytes, lang: str = "jpn") -> str:
         return ""
     cmd = [tess, "stdin", "stdout", "-l", lang, "--psm", "3"]
     try:
-        result = subprocess.run(
+        result = run_silent(
             cmd,
             input=image_bytes,
             capture_output=True,
@@ -116,7 +117,7 @@ def extract_text_pdftotext(pdf_path: Path, page_no: int | None = None,
         if page_no is not None:
             cmd += ["-f", str(page_no), "-l", str(page_no)]
         cmd += [str(tmp_path), "-"]
-        out = subprocess.run(cmd, capture_output=True, timeout=60)
+        out = run_silent(cmd, capture_output=True, timeout=60)
         return out.stdout.decode("utf-8", errors="replace")
     except Exception:
         return ""
