@@ -148,6 +148,8 @@ def collect_pages(src_dir: Path, thumb_dir: Path,
                     "title_markers": list(TITLE_MARKER_RE.findall(
                         "\n".join(text.splitlines()[:5]))),
                     "bigram": _bigram(text),
+                    # issue #38: 書類タイプを格納し、境界判定に活用する
+                    "kind": textops.extract_kind(text),
                 })
         finally:
             doc.close()
@@ -178,6 +180,13 @@ def score_boundary(prev: dict, cur: dict) -> tuple[float, list[str]]:
     if new_titles:
         score += 0.5
         reasons.append("新タイトル " + ", ".join(list(new_titles)[:2]))
+    # issue #38: 書類タイプの変化を強い境界として扱う。
+    # "書類" (デフォルト/フォールバック) は「タイプ不明」を意味するため除外する。
+    prev_kind = prev.get("kind", "書類")
+    cur_kind = cur.get("kind", "書類")
+    if prev_kind != cur_kind and prev_kind != "書類" and cur_kind != "書類":
+        score += 0.8
+        reasons.append(f"書類タイプ変化 {prev_kind} → {cur_kind}")
     if not reasons:
         reasons.append(f"類似 (j={j:.2f})")
     return min(score, 1.0), reasons
