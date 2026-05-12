@@ -748,6 +748,86 @@ class TestMenubuttonInput:
         me.assert_not_called()
 
 
+    # ------------------------------------------------------------------
+    # issue #63: ディレクトリ混入時の確認ダイアログ（B 案）
+    # ------------------------------------------------------------------
+
+    def test_get_inputs_mixed_dir_and_pdf_shows_warning(self, tmp_path):
+        """issue #63: dir + PDF 混在のとき askokcancel が呼ばれること"""
+        from pdf_split_autorenamer import gui as gui_module
+        dir_path = tmp_path / "subdir"
+        dir_path.mkdir()
+        pdf1 = tmp_path / "a.pdf"
+        pdf2 = tmp_path / "b.pdf"
+        pdf1.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        pdf2.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app("")
+        app._input_paths = [dir_path, pdf1, pdf2]
+        with patch.object(gui_module.messagebox, "askokcancel", return_value=True) as mok, \
+             patch.object(app, "update_idletasks", return_value=None):
+            app._get_inputs()
+        mok.assert_called_once()
+
+    def test_get_inputs_mixed_dir_pdf_continue_returns_pdfs_only(self, tmp_path):
+        """issue #63: 混在 + 続行（OK=True）→ PDF のみ返ること"""
+        from pdf_split_autorenamer import gui as gui_module
+        dir_path = tmp_path / "subdir"
+        dir_path.mkdir()
+        pdf1 = tmp_path / "a.pdf"
+        pdf2 = tmp_path / "b.pdf"
+        pdf1.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        pdf2.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app("")
+        app._input_paths = [dir_path, pdf1, pdf2]
+        with patch.object(gui_module.messagebox, "askokcancel", return_value=True), \
+             patch.object(app, "update_idletasks", return_value=None):
+            result = app._get_inputs()
+        assert set(result) == {pdf1, pdf2}
+
+    def test_get_inputs_mixed_dir_pdf_cancel_returns_none(self, tmp_path):
+        """issue #63: 混在 + 中止（OK=False）→ None を返すこと"""
+        from pdf_split_autorenamer import gui as gui_module
+        dir_path = tmp_path / "subdir"
+        dir_path.mkdir()
+        pdf1 = tmp_path / "a.pdf"
+        pdf1.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app("")
+        app._input_paths = [dir_path, pdf1]
+        with patch.object(gui_module.messagebox, "askokcancel", return_value=False), \
+             patch.object(app, "update_idletasks", return_value=None):
+            result = app._get_inputs()
+        assert result is None
+
+    def test_get_inputs_multiple_only_dirs_no_warning_single_branch(self, tmp_path):
+        """issue #63: 単一ディレクトリのみは既存挙動のまま askokcancel を呼ばないこと"""
+        from pdf_split_autorenamer import gui as gui_module
+        dir_path = tmp_path
+        app = _make_app("")
+        app._input_paths = [dir_path]
+        with patch.object(gui_module.messagebox, "askokcancel") as mok, \
+             patch.object(app, "update_idletasks", return_value=None):
+            result = app._get_inputs()
+        mok.assert_not_called()
+        assert result == dir_path
+
+    def test_get_inputs_multiple_only_dirs_triggers_error(self, tmp_path):
+        """issue #63: dir 複数 + PDF ゼロ → showerror が呼ばれ None を返すこと"""
+        from pdf_split_autorenamer import gui as gui_module
+        dir1 = tmp_path / "d1"
+        dir2 = tmp_path / "d2"
+        dir1.mkdir()
+        dir2.mkdir()
+        app = _make_app("")
+        app._input_paths = [dir1, dir2]
+        with patch.object(gui_module.messagebox, "showerror") as me, \
+             patch.object(gui_module.messagebox, "askokcancel") as mok, \
+             patch.object(app, "update_idletasks", return_value=None):
+            result = app._get_inputs()
+        me.assert_called_once()
+        mok.assert_not_called()
+        assert result is None
+
+
 class TestMain:
     def test_main_creates_app_and_mainloops(self):
         """main() が App を生成して mainloop() を呼ぶこと"""
