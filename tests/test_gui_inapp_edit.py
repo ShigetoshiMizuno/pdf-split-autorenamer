@@ -47,6 +47,7 @@ def _make_app(folder: str = "") -> object:
         "profile_var": _StringVar(""),
         "status_var": _StringVar("待機中"),
         "log": MagicMock(),
+        "_input_paths": [],  # issue #48: 複数入力パスリスト
     })
     return app
 

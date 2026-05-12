@@ -611,7 +611,7 @@ render();
 """
 
 
-def run_analyze(src_dir: Path, work_dir: Path | None = None,
+def run_analyze(src_dir: Path | list[Path], work_dir: Path | None = None,
                 pdftotext_path: str | None = None,
                 title: str = "PDF 分割レビュー",
                 ocr_fallback: bool = True,
@@ -624,14 +624,27 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
 
     issue #35: src_dir が PDF ファイル単体を指している場合は、その親ディレクトリを
     src_dir として扱い、対象 PDF を 1 件だけにフィルタする。
+
+    issue #48: src_dir が list[Path] の場合は、指定された PDF ファイルのみを処理する。
+    共通の親ディレクトリを src_dir として使用する。
     """
-    src_path = Path(src_dir)
+    # issue #48: list[Path] の処理
+    explicit_pdf_names: set[str] | None = None
     single_pdf_name: str | None = None
-    if src_path.is_file() and src_path.suffix.lower() == ".pdf":
-        single_pdf_name = src_path.name
-        src_dir = src_path.parent
+    if isinstance(src_dir, list):
+        pdf_paths = [Path(p) for p in src_dir]
+        if not pdf_paths:
+            return {"pages": 0, "groups": 0}
+        # 共通親ディレクトリを src_dir として使用
+        src_dir = pdf_paths[0].parent
+        explicit_pdf_names = {p.name for p in pdf_paths}
     else:
-        src_dir = src_path
+        src_path = Path(src_dir)
+        if src_path.is_file() and src_path.suffix.lower() == ".pdf":
+            single_pdf_name = src_path.name
+            src_dir = src_path.parent
+        else:
+            src_dir = src_path
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     thumb_dir = work_dir / "thumbs"
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -642,6 +655,9 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
     def _filter(p: Path) -> bool:
         # 出力済みっぽい (`<stem>_NN[_name].pdf`) は対象外
         if split_re.search(p.name):
+            return False
+        # issue #48: list[Path] モードでは指定ファイルだけ通す
+        if explicit_pdf_names is not None and p.name not in explicit_pdf_names:
             return False
         # 単一 PDF モードでは対象ファイルだけ通す
         if single_pdf_name is not None and p.name != single_pdf_name:

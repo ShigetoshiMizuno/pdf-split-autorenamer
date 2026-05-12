@@ -50,6 +50,8 @@ class App(tk.Tk):
         self.folder_var = tk.StringVar(value=initial_folder or "")
         self.profile_var = tk.StringVar(value="")
         self.force_var = tk.BooleanVar(value=False)
+        # issue #48: 実際の入力パスリスト（複数 PDF 選択時に使用）
+        self._input_paths: list[Path] = []
 
         self._build_ui()
 
@@ -61,8 +63,14 @@ class App(tk.Tk):
         ttk.Label(top, text="PDFフォルダ／ファイル:").pack(side="left")
         ent = ttk.Entry(top, textvariable=self.folder_var)
         ent.pack(side="left", fill="x", expand=True, padx=(6, 6))
-        ttk.Button(top, text="フォルダ…", command=self._on_browse).pack(side="left")
-        ttk.Button(top, text="ファイル…", command=self._on_browse_file).pack(side="left", padx=(4, 0))
+        # issue #48: 2 ボタンを Menubutton（ドロップダウン）に統合
+        browse_menu = tk.Menu(self, tearoff=False)
+        browse_menu.add_command(label="PDF を選ぶ（複数選択可）…",
+                                command=self._on_browse_files)
+        browse_menu.add_command(label="フォルダを選ぶ…",
+                                command=self._on_browse)
+        browse_btn = ttk.Menubutton(top, text="参照… ▼", menu=browse_menu)
+        browse_btn.pack(side="left")
 
         # 用語集（任意）: issue #50
         profile_row = ttk.Frame(self, padding=(8, 0, 8, 4))
@@ -120,23 +128,40 @@ class App(tk.Tk):
 
     # ----- イベント -----
     def _on_browse(self) -> None:
+        """フォルダを選択する。issue #48: _input_paths も更新する。"""
         d = filedialog.askdirectory(title="PDFフォルダを選択",
                                     initialdir=self.folder_var.get() or ".")
         if d:
             self.folder_var.set(d)
+            self._input_paths = [Path(d)]
 
-    def _on_browse_file(self) -> None:
-        """issue #35: 単一 PDF ファイルを選択可能にする。"""
+    def _on_browse_files(self) -> None:
+        """issue #48: PDF ファイルを複数選択する。"""
         initial = self.folder_var.get() or "."
         if Path(initial).is_file():
             initial = str(Path(initial).parent)
-        p = filedialog.askopenfilename(
-            title="PDF ファイルを選択",
+        elif Path(initial).is_dir():
+            pass
+        else:
+            initial = "."
+        paths = filedialog.askopenfilenames(
+            title="PDF ファイルを選択（複数選択可）",
             initialdir=initial,
             filetypes=[("PDF ファイル", "*.pdf"), ("すべてのファイル", "*.*")],
         )
-        if p:
-            self.folder_var.set(p)
+        if not paths:
+            return
+        pdf_paths = [Path(p) for p in paths]
+        self._input_paths = pdf_paths
+        if len(pdf_paths) == 1:
+            self.folder_var.set(str(pdf_paths[0]))
+        else:
+            first = pdf_paths[0].name
+            self.folder_var.set(f"({len(pdf_paths)} ファイル) {first} 他 {len(pdf_paths) - 1} 件")
+
+    def _on_browse_file(self) -> None:
+        """後方互換のため残す。issue #35 の単一 PDF 選択（内部的には _on_browse_files を呼ぶ）。"""
+        self._on_browse_files()
 
     def _on_browse_profile(self) -> None:
         """issue #50: 用語集 TOML ファイルを選択する。"""
@@ -148,7 +173,38 @@ class App(tk.Tk):
             self.profile_var.set(p)
 
     def _get_folder(self) -> Path | None:
-        """入力パスを返す。フォルダまたは PDF ファイル (issue #35)。"""
+        """入力パスを返す。フォルダまたは PDF ファイル (issue #35)。
+
+        後方互換のため維持。新規コードは _get_inputs() を使うこと。
+        """
+        result = self._get_inputs()
+        if result is None:
+            return None
+        if isinstance(result, list):
+            # 複数 PDF の場合は最初の PDF の親ディレクトリを返す（_get_folder の契約を守る）
+            return result[0]
+        return result
+
+    def _get_inputs(self) -> Path | list[Path] | None:
+        """issue #48: 入力を返す。
+
+        - フォルダ: Path（ディレクトリ）
+        - 単一 PDF: Path（ファイル）
+        - 複数 PDF: list[Path]
+        - 未選択: None（警告ダイアログ表示）
+        """
+        # _input_paths が設定されていれば優先
+        if self._input_paths:
+            if len(self._input_paths) == 1:
+                p = self._input_paths[0]
+                if p.is_dir():
+                    return p
+                if p.is_file() and p.suffix.lower() == ".pdf":
+                    return p
+            else:
+                return list(self._input_paths)
+
+        # フォールバック: folder_var の文字列から判断
         v = self.folder_var.get().strip()
         if not v:
             messagebox.showwarning(
@@ -215,17 +271,18 @@ class App(tk.Tk):
 
     # ----- アクション -----
     def _on_analyze(self) -> None:
-        folder = self._get_folder()
-        if not folder:
+        inputs = self._get_inputs()
+        if not inputs:
             return
-        self._log(f"=== 解析開始: {folder} ===")
+        label = str(inputs) if not isinstance(inputs, list) else f"{len(inputs)} ファイル"
+        self._log(f"=== 解析開始: {label} ===")
         self._set_status("解析中…")
 
         def do():
             # issue #50: profile_var に TOML パスが入っていれば run_analyze に渡す
             profile_str = self.profile_var.get().strip()
             profile = Path(profile_str) if profile_str else None
-            return _analyze.run_analyze(folder, profile=profile)
+            return _analyze.run_analyze(inputs, profile=profile)
 
         def done(res):
             pages = res.get("pages", 0)
@@ -267,9 +324,13 @@ class App(tk.Tk):
         self._run_async(do, done)
 
     def _on_open_report(self) -> None:
-        folder = self._get_folder()
-        if not folder:
+        inputs = self._get_inputs()
+        if not inputs:
             return
+        # フォルダまたは先頭 PDF の親ディレクトリを使う
+        folder = inputs if isinstance(inputs, Path) and inputs.is_dir() else (
+            inputs[0].parent if isinstance(inputs, list) else inputs.parent
+        )
         html = folder / ".psar" / "report.html"
         if not html.exists():
             messagebox.showwarning("警告", f"レポートが未生成です。先に「解析を実行」を押してください。\n{html}")
@@ -291,9 +352,16 @@ class App(tk.Tk):
             )
             return
 
-        folder = self._get_folder()
-        if not folder:
+        inputs = self._get_inputs()
+        if not inputs:
             return
+        # work_dir: フォルダ/.psar または PDF の親/.psar
+        if isinstance(inputs, list):
+            folder = inputs[0].parent
+        elif inputs.is_dir():
+            folder = inputs
+        else:
+            folder = inputs.parent
         work_dir = folder / ".psar"
         html = work_dir / "report.html"
         if not html.exists():
@@ -329,8 +397,8 @@ class App(tk.Tk):
         self._run_async(runner, done)
 
     def _on_split(self, apply_: bool) -> None:
-        folder = self._get_folder()
-        if not folder:
+        inputs = self._get_inputs()
+        if not inputs:
             return
         force = self.force_var.get()
 
@@ -340,7 +408,7 @@ class App(tk.Tk):
             self._set_status("dry-run 中…")
 
             def do_dry():
-                return _split.run_split(folder, dry_run=True, force=force)
+                return _split.run_split(inputs, dry_run=True, force=force)
 
             def done_dry(res):
                 for a in res["actions"]:
@@ -357,7 +425,7 @@ class App(tk.Tk):
         self._set_status("確認中…")
 
         def do_preview():
-            return _split.run_split(folder, dry_run=True, force=force)
+            return _split.run_split(inputs, dry_run=True, force=force)
 
         def done_preview(res):
             summary = self._build_split_summary(res)
@@ -369,7 +437,7 @@ class App(tk.Tk):
             self._set_status("分割中…")
 
             def do_apply():
-                return _split.run_split(folder, dry_run=False, force=force)
+                return _split.run_split(inputs, dry_run=False, force=force)
 
             def done_apply(res2):
                 for a in res2["actions"]:

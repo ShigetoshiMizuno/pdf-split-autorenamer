@@ -46,6 +46,7 @@ def _make_app(folder: str = "") -> object:
         "force_var": _BooleanVar(False),
         "status_var": _StringVar("待機中"),
         "log": MagicMock(),
+        "_input_paths": [],  # issue #48: 複数入力パスリスト
     })
     return app
 
@@ -157,7 +158,7 @@ class TestOnAnalyzePassesProfile:
             captured_kwargs.update(kwargs)
             return mock_result
 
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", side_effect=fake_run_analyze), \
@@ -184,7 +185,7 @@ class TestOnAnalyzePassesProfile:
             captured_kwargs.update(kwargs)
             return mock_result
 
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", side_effect=fake_run_analyze), \

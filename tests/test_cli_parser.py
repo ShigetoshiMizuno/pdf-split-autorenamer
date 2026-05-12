@@ -40,10 +40,10 @@ class TestBuildParser:
 
 class TestAnalyzeParser:
     def test_analyze_folder_arg(self):
-        """analyze サブコマンドで folder 引数が取得できる"""
+        """analyze サブコマンドで inputs 引数が取得できる (issue #48: nargs="+")"""
         p = build_parser()
         args = p.parse_args(["analyze", "./folder"])
-        assert args.folder == "./folder"
+        assert args.inputs == ["./folder"]
 
     def test_analyze_no_ocr_fallback_default_false(self):
         """--no-ocr-fallback のデフォルトは False"""
@@ -124,10 +124,10 @@ class TestAnalyzeParser:
 
 class TestSplitParser:
     def test_split_folder_arg(self):
-        """split サブコマンドで folder 引数が取得できる"""
+        """split サブコマンドで inputs 引数が取得できる (issue #48: nargs="+")"""
         p = build_parser()
         args = p.parse_args(["split", "./folder"])
-        assert args.folder == "./folder"
+        assert args.inputs == ["./folder"]
 
     def test_split_dry_run_default_false(self):
         """--dry-run のデフォルトは False"""
@@ -875,3 +875,93 @@ class TestSubcommandHelpNoInternalTerms:
         help_text = _top_help()
         assert "report.html" not in help_text, \
             f"issue #50: トップ help に 'report.html' が露出している: {help_text!r}"
+
+
+# ---------------------------------------------------------------------------
+# issue #48: analyze / split が複数ファイル引数をサポートすること (nargs="+")
+# ---------------------------------------------------------------------------
+
+class TestAnalyzeMultipleFilesParser:
+    def test_analyze_accepts_multiple_files(self):
+        """issue #48: analyze に複数のファイルパスを渡せること (nargs="+")"""
+        p = build_parser()
+        args = p.parse_args(["analyze", "a.pdf", "b.pdf", "c.pdf"])
+        assert args.inputs == ["a.pdf", "b.pdf", "c.pdf"]
+
+    def test_analyze_single_file_as_list(self):
+        """issue #48: analyze に単一ファイルを渡すと list[str] になること"""
+        p = build_parser()
+        args = p.parse_args(["analyze", "a.pdf"])
+        assert args.inputs == ["a.pdf"]
+
+    def test_analyze_single_folder_as_list(self):
+        """issue #48: analyze にフォルダを渡すと list[str] になること"""
+        p = build_parser()
+        args = p.parse_args(["analyze", "./folder"])
+        assert args.inputs == ["./folder"]
+
+
+class TestSplitMultipleFilesParser:
+    def test_split_accepts_multiple_files(self):
+        """issue #48: split に複数のファイルパスを渡せること (nargs="+")"""
+        p = build_parser()
+        args = p.parse_args(["split", "a.pdf", "b.pdf"])
+        assert args.inputs == ["a.pdf", "b.pdf"]
+
+    def test_split_single_folder_as_list(self):
+        """issue #48: split にフォルダを渡すと list[str] になること"""
+        p = build_parser()
+        args = p.parse_args(["split", "./folder"])
+        assert args.inputs == ["./folder"]
+
+
+class TestCmdAnalyzeMultipleFiles:
+    def test_cmd_analyze_multiple_pdfs(self, tmp_path):
+        """issue #48: cmd_analyze に複数 PDF を渡すと run_analyze が list[Path] で呼ばれる"""
+        from pdf_split_autorenamer.cli import cmd_analyze
+        import argparse
+        pdf1 = tmp_path / "a.pdf"
+        pdf2 = tmp_path / "b.pdf"
+        pdf1.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        pdf2.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        args = argparse.Namespace(
+            inputs=[str(pdf1), str(pdf2)],
+            work_dir=None,
+            pdftotext=None,
+            title="Test",
+            no_ocr_fallback=False,
+            ocr_strategy="balanced",
+            yes=False,
+            profile=None,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
+        with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result) as mock_run:
+            result = cmd_analyze(args)
+        assert result == 0
+        # list[Path] として呼ばれていること
+        called_inputs = mock_run.call_args[0][0]
+        assert isinstance(called_inputs, list)
+        assert all(isinstance(p, Path) for p in called_inputs)
+
+    def test_cmd_analyze_single_folder_still_works(self, tmp_path):
+        """issue #48: cmd_analyze に単一フォルダを渡しても動作する（後方互換）"""
+        from pdf_split_autorenamer.cli import cmd_analyze
+        import argparse
+        args = argparse.Namespace(
+            inputs=[str(tmp_path)],
+            work_dir=None,
+            pdftotext=None,
+            title="Test",
+            no_ocr_fallback=False,
+            ocr_strategy="balanced",
+            yes=False,
+            profile=None,
+            verbose=False,
+            quiet=False,
+        )
+        mock_result = {"pages": 0, "groups": 0, "report_html": "", "groups_json": ""}
+        with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
+            result = cmd_analyze(args)
+        assert result == 0
