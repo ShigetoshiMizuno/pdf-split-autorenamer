@@ -248,6 +248,18 @@ class TestRunSplit:
         assert result["files_written"] == 1
         assert (tmp_path / "source_01_週報.pdf").exists()
 
+    def test_split_accepts_single_pdf_path(self, tmp_path):
+        """issue #35: src_dir に PDF ファイルパスを渡しても親ディレクトリで動作する"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 1], "name": "週報"}]},
+        )
+        result = run_split(src)  # ファイルパスを直接渡す
+        assert result["files_written"] == 1
+        assert (tmp_path / "source_01_週報.pdf").exists()
+
     def test_skip_existing_without_force(self, tmp_path):
         """既存ファイルがある場合 force=False でスキップされる"""
         src = tmp_path / "source.pdf"

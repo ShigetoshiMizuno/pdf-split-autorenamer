@@ -163,6 +163,49 @@ class TestGetFolder:
         result = app._get_folder()
         assert result == tmp_path
 
+    def test_valid_pdf_file_returns_path(self, tmp_path):
+        """issue #35: 単一 PDF ファイルパスでも受理する"""
+        pdf = tmp_path / "x.pdf"
+        pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app(str(pdf))
+        result = app._get_folder()
+        assert result == pdf
+
+
+class TestOnBrowseFile:
+    def test_browse_file_sets_path(self, tmp_path):
+        """issue #35: ファイル選択で folder_var に PDF パスがセットされる"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        with patch.object(gui_module.filedialog, "askopenfilename",
+                          return_value="/tmp/a.pdf"):
+            app._on_browse_file()
+        assert app.folder_var.get() == "/tmp/a.pdf"
+
+    def test_browse_file_cancel_keeps_existing(self):
+        """ファイル選択キャンセルなら folder_var は変更されない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("/orig")
+        with patch.object(gui_module.filedialog, "askopenfilename", return_value=""):
+            app._on_browse_file()
+        assert app.folder_var.get() == "/orig"
+
+    def test_browse_file_initial_from_file(self, tmp_path):
+        """既に PDF ファイルが入っているとき、initialdir はその親フォルダ"""
+        from pdf_split_autorenamer import gui as gui_module
+        pdf = tmp_path / "x.pdf"
+        pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app(str(pdf))
+        captured = {}
+
+        def fake_open(**kwargs):
+            captured.update(kwargs)
+            return ""
+
+        with patch.object(gui_module.filedialog, "askopenfilename", side_effect=fake_open):
+            app._on_browse_file()
+        assert captured.get("initialdir") == str(tmp_path)
+
 
 # ---------------------------------------------------------------------------
 # _log / _set_status  (lines 158-164)
