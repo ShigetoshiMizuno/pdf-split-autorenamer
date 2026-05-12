@@ -203,6 +203,7 @@ class App(tk.Tk):
         self._set_status("解析中…")
 
         def do():
+            # profile は CLI からのみ指定可能。GUI 用語集 UI は別 issue (#50) で対応予定。
             return _analyze.run_analyze(folder)
 
         def done(res):

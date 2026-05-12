@@ -33,7 +33,7 @@ from pdf_split_autorenamer.rename import (
 class TestChooseDate:
     def test_date_in_text_is_returned(self):
         """テキスト中に日付が含まれる → その日付を返す"""
-        text = "2026年4月6日の礼拝"
+        text = "2026年4月6日の会議"
         result = choose_date(text, "file_01.pdf")
         assert result == "2026-04-06"
 
@@ -48,17 +48,17 @@ class TestChooseDate:
 
     def test_none_when_no_date_anywhere(self):
         """テキストにもファイル名にも日付なし → None を返す"""
-        result = choose_date("日付のないテキスト", "scan_01_週報.pdf")
+        result = choose_date("日付のないテキスト", "scan_01_議事録.pdf")
         assert result is None
 
     def test_most_frequent_date_returned(self):
         """複数の日付候補がある → 最頻出を返す"""
         # 2026-04-06 が 3回, 2026-04-13 が 1回
         text = (
-            "2026年4月6日の礼拝\n"
+            "2026年4月6日の会議\n"
             "2026年4月6日のお知らせ\n"
             "2026年4月6日 以上\n"
-            "2026年4月13日の次回礼拝"
+            "2026年4月13日の次回会議"
         )
         result = choose_date(text, "scan_01.pdf")
         assert result == "2026-04-06"
@@ -66,7 +66,7 @@ class TestChooseDate:
     def test_hint_filename_date_preferred_when_in_candidates(self):
         """ヒントファイル名の日付が候補中に含まれる → ヒントの日付を返す"""
         # ヒント: 2026-04-13、テキスト候補: 2026-04-06（1回）, 2026-04-13（1回）
-        text = "2026年4月6日と2026年4月13日の礼拝"
+        text = "2026年4月6日と2026年4月13日の会議"
         result = choose_date(text, "scan_01_2026-04-13.pdf")
         assert result == "2026-04-13"
 
@@ -111,29 +111,29 @@ class TestResolveFilenames:
     def test_unique_date_and_kind_no_suffix(self):
         """ユニークな日付+書類タイプ → ベース名のまま .pdf を付与"""
         plan = [
-            self._make_item("2026-04-06", "週報"),
+            self._make_item("2026-04-06", "議事録"),
         ]
         result = resolve_filenames(plan)
-        assert result[0]["final"] == "2026-04-06_週報.pdf"
+        assert result[0]["final"] == "2026-04-06_議事録.pdf"
 
     def test_duplicate_date_and_kind_gets_suffix(self):
         """同じ日付+書類タイプが2件 → _01.pdf, _02.pdf のサフィックスが付く"""
         plan = [
-            self._make_item("2026-04-06", "週報"),
-            self._make_item("2026-04-06", "週報"),
+            self._make_item("2026-04-06", "議事録"),
+            self._make_item("2026-04-06", "議事録"),
         ]
         result = resolve_filenames(plan)
         finals = {item["final"] for item in result}
-        assert "2026-04-06_週報_01.pdf" in finals
-        assert "2026-04-06_週報_02.pdf" in finals
+        assert "2026-04-06_議事録_01.pdf" in finals
+        assert "2026-04-06_議事録_02.pdf" in finals
 
     def test_none_date_uses_日付不明_prefix(self):
         """date が None → 日付不明_xxx.pdf 形式になる"""
         plan = [
-            self._make_item(None, "週報"),
+            self._make_item(None, "議事録"),
         ]
         result = resolve_filenames(plan)
-        assert result[0]["final"] == "日付不明_週報.pdf"
+        assert result[0]["final"] == "日付不明_議事録.pdf"
 
     def test_none_date_duplicate_gets_suffix(self):
         """date が None の重複も連番サフィックスが付く"""
@@ -149,31 +149,31 @@ class TestResolveFilenames:
     def test_different_kinds_no_suffix(self):
         """同じ日付でも書類タイプが違う場合はサフィックスなし"""
         plan = [
-            self._make_item("2026-04-06", "週報"),
+            self._make_item("2026-04-06", "議事録"),
             self._make_item("2026-04-06", "会計報告"),
         ]
         result = resolve_filenames(plan)
         finals = {item["final"] for item in result}
-        assert "2026-04-06_週報.pdf" in finals
+        assert "2026-04-06_議事録.pdf" in finals
         assert "2026-04-06_会計報告.pdf" in finals
 
     def test_three_duplicates_get_01_02_03(self):
         """3件重複 → _01, _02, _03 が付く"""
         plan = [
-            self._make_item("2026-04-06", "週報"),
-            self._make_item("2026-04-06", "週報"),
-            self._make_item("2026-04-06", "週報"),
+            self._make_item("2026-04-06", "議事録"),
+            self._make_item("2026-04-06", "議事録"),
+            self._make_item("2026-04-06", "議事録"),
         ]
         result = resolve_filenames(plan)
         finals = [item["final"] for item in result]
-        assert "2026-04-06_週報_01.pdf" in finals
-        assert "2026-04-06_週報_02.pdf" in finals
-        assert "2026-04-06_週報_03.pdf" in finals
+        assert "2026-04-06_議事録_01.pdf" in finals
+        assert "2026-04-06_議事録_02.pdf" in finals
+        assert "2026-04-06_議事録_03.pdf" in finals
 
     def test_final_field_is_added_to_each_item(self):
         """resolve_filenames 後に各 item に final フィールドが付与される"""
         plan = [
-            self._make_item("2026-04-06", "週報"),
+            self._make_item("2026-04-06", "議事録"),
             self._make_item("2026-05-11", "会計報告"),
         ]
         result = resolve_filenames(plan)
@@ -184,18 +184,18 @@ class TestResolveFilenames:
     def test_fallback_used_when_kind_is_default(self):
         """kind が '書類' かつ fallback がある場合は fallback が使われる"""
         plan = [
-            self._make_item("2026-04-06", "書類", fallback="週報20260406"),
+            self._make_item("2026-04-06", "書類", fallback="議事録20260406"),
         ]
         result = resolve_filenames(plan)
         # fallback が kind_part として使われるため、"書類" ではなく fallback が入る
         assert "書類" not in result[0]["final"] or result[0]["final"] == "2026-04-06_書類.pdf"
         # fallback が使われた場合
         if result[0]["final"] != "2026-04-06_書類.pdf":
-            assert "週報20260406" in result[0]["final"]
+            assert "議事録20260406" in result[0]["final"]
 
     def test_returns_list_of_dict(self):
         """戻り値は list[dict] である"""
-        plan = [self._make_item("2026-04-06", "週報")]
+        plan = [self._make_item("2026-04-06", "議事録")]
         result = resolve_filenames(plan)
         assert isinstance(result, list)
         assert isinstance(result[0], dict)
@@ -234,18 +234,18 @@ class TestDateFromFilename:
 class TestExistingNamePart:
     def test_split_format_returns_name_part(self):
         """stem_NN_name.pdf 形式から name 部分を返す"""
-        result = existing_name_part("scan_01_週報.pdf")
-        assert result == "週報"
+        result = existing_name_part("scan_01_議事録.pdf")
+        assert result == "議事録"
 
     def test_unknown_prefix_returns_name(self):
         """日付不明_name.pdf 形式から name 部分を返す"""
-        result = existing_name_part("日付不明_週報.pdf")
-        assert result == "週報"
+        result = existing_name_part("日付不明_議事録.pdf")
+        assert result == "議事録"
 
     def test_dated_format_returns_name(self):
         """YYYY-MM-DD_name.pdf 形式から name 部分を返す"""
-        result = existing_name_part("2026-04-06_週報.pdf")
-        assert result == "週報"
+        result = existing_name_part("2026-04-06_議事録.pdf")
+        assert result == "議事録"
 
     def test_no_match_returns_empty(self):
         """どのパターンにも一致しない場合は空文字列を返す"""
@@ -295,28 +295,28 @@ class TestFindTargets:
     def test_excludes_dated_pdfs_in_split_mode(self, tmp_path):
         """split モードで YYYY-MM-DD_*.pdf は除外される"""
         (tmp_path / "scan_01.pdf").write_bytes(b"")
-        (tmp_path / "2026-04-06_週報.pdf").write_bytes(b"")
+        (tmp_path / "2026-04-06_議事録.pdf").write_bytes(b"")
         result = find_targets(tmp_path, mode="split")
         names = [p.name for p in result]
-        assert "2026-04-06_週報.pdf" not in names
+        assert "2026-04-06_議事録.pdf" not in names
 
     def test_finds_unknown_pdfs_in_unknown_mode(self, tmp_path):
         """unknown モードで 日付不明_*.pdf を検出する"""
-        (tmp_path / "日付不明_週報.pdf").write_bytes(b"")
+        (tmp_path / "日付不明_議事録.pdf").write_bytes(b"")
         (tmp_path / "scan_01.pdf").write_bytes(b"")
         result = find_targets(tmp_path, mode="unknown")
         names = [p.name for p in result]
-        assert "日付不明_週報.pdf" in names
+        assert "日付不明_議事録.pdf" in names
         assert "scan_01.pdf" not in names
 
     def test_all_mode_finds_both(self, tmp_path):
         """all モードで分割直後と日付不明の両方を検出する"""
         (tmp_path / "scan_01.pdf").write_bytes(b"")
-        (tmp_path / "日付不明_週報.pdf").write_bytes(b"")
+        (tmp_path / "日付不明_議事録.pdf").write_bytes(b"")
         result = find_targets(tmp_path, mode="all")
         names = [p.name for p in result]
         assert "scan_01.pdf" in names
-        assert "日付不明_週報.pdf" in names
+        assert "日付不明_議事録.pdf" in names
 
     def test_excludes_orig_pattern(self, tmp_path):
         """YYYY-MM-DD-HH-MM-SS.pdf（元ファイル）は全モードで除外される"""
@@ -333,11 +333,11 @@ class TestFindTargets:
     def test_all_mode_excludes_dated_non_unknown_files(self, tmp_path):
         """all モードでも YYYY-MM-DD_*.pdf（非日付不明）は除外される（line 90 pass→continue）"""
         (tmp_path / "scan_01.pdf").write_bytes(b"")
-        (tmp_path / "2026-04-06_週報.pdf").write_bytes(b"")  # DATED_PAT match, not UNKNOWN_PAT
+        (tmp_path / "2026-04-06_議事録.pdf").write_bytes(b"")  # DATED_PAT match, not UNKNOWN_PAT
         result = find_targets(tmp_path, mode="all")
         names = [p.name for p in result]
         assert "scan_01.pdf" in names
-        assert "2026-04-06_週報.pdf" not in names
+        assert "2026-04-06_議事録.pdf" not in names
 
     def test_non_file_pdf_glob_result_skipped(self, tmp_path):
         """glob が返す *.pdf がファイルでない（ディレクトリ）場合はスキップ (line 83)"""
@@ -368,7 +368,7 @@ class TestMakePlan:
 
     def test_make_plan_returns_list_of_dicts(self, tmp_path):
         """make_plan は list[dict] を返す"""
-        p = self._make_pdf(tmp_path, "scan_01.pdf", "2026年4月6日の週報")
+        p = self._make_pdf(tmp_path, "scan_01.pdf", "2026年4月6日の議事録")
         result = make_plan([p], ocr_fallback=False)
         assert isinstance(result, list)
         assert len(result) == 1
@@ -376,7 +376,7 @@ class TestMakePlan:
 
     def test_make_plan_item_has_required_keys(self, tmp_path):
         """各アイテムに src, date, kind, head, fallback キーがある"""
-        p = self._make_pdf(tmp_path, "scan_01.pdf", "2026年4月6日の週報")
+        p = self._make_pdf(tmp_path, "scan_01.pdf", "2026年4月6日の議事録")
         result = make_plan([p], ocr_fallback=False)
         item = result[0]
         for key in ("src", "date", "kind", "head", "fallback"):
@@ -396,12 +396,12 @@ class TestMakePlan:
 
     def test_make_plan_kind_from_filename_when_text_generic(self, tmp_path):
         """テキストから kind が決まらないとき、ファイル名のヒントで kind を補完する（line 123）"""
-        # scan_01_週報.pdf という名前にする → existing_name_part → "週報" → extract_kind → "週報"
-        p = self._make_pdf(tmp_path, "scan_01_週報.pdf", "2026-04-06")
+        # scan_01_議事録.pdf という名前にする → existing_name_part → "議事録" → extract_kind → "議事録"
+        p = self._make_pdf(tmp_path, "scan_01_議事録.pdf", "2026-04-06")
         result = make_plan([p], ocr_fallback=False)
         # テキスト "2026-04-06" は kind を "書類" にする（パターン不一致）
-        # ファイル名ヒント "週報" から kind が "週報" に補完される
-        assert result[0]["kind"] == "週報"
+        # ファイル名ヒント "議事録" から kind が "議事録" に補完される
+        assert result[0]["kind"] == "議事録"
 
 
 # ---------------------------------------------------------------------------
@@ -411,12 +411,12 @@ class TestMakePlan:
 class TestFallbackTitleNonEmpty:
     def test_name_part_extracted_and_returned(self):
         """split 形式ファイル名から名前部分を取り出して返す"""
-        result = fallback_title("scan_01_週報.pdf")
-        assert result == "週報"
+        result = fallback_title("scan_01_議事録.pdf")
+        assert result == "議事録"
 
     def test_date_in_name_part_is_stripped(self):
         """名前部分に日付が含まれていれば除去される"""
-        result = fallback_title("scan_01_2026-04-06_週報.pdf")
+        result = fallback_title("scan_01_2026-04-06_議事録.pdf")
         assert "2026" not in result
         assert "04" not in result
         assert "06" not in result

@@ -58,7 +58,7 @@ class TestCalcJapaneseRatio:
     def test_pure_japanese(self):
         """純日本語テキストは比率が高い"""
         from pdf_split_autorenamer.pdfio import calc_japanese_ratio
-        ratio = calc_japanese_ratio("主日礼拝メッセージ要旨")
+        ratio = calc_japanese_ratio("請求書")
         assert ratio > 0.8
 
     def test_pure_ascii(self):
@@ -76,7 +76,7 @@ class TestCalcJapaneseRatio:
     def test_mixed_text(self):
         """日英混在は 0 < ratio < 1"""
         from pdf_split_autorenamer.pdfio import calc_japanese_ratio
-        ratio = calc_japanese_ratio("Hello 礼拝 World")
+        ratio = calc_japanese_ratio("Hello 会議 World")
         assert 0.0 < ratio < 1.0
 
 
@@ -258,7 +258,7 @@ class TestCollectPagesLlmStrategy:
              patch("pdf_split_autorenamer.analyze.crop_page_pixmap", return_value=b"png"), \
              patch("pdf_split_autorenamer.analyze.get_ocr_cache_path", return_value=tmp_path / "cache.txt"), \
              patch("pdf_split_autorenamer.analyze.read_ocr_cache", return_value=None), \
-             patch("pdf_split_autorenamer.analyze._try_llm_vision", return_value="2026-04-06\n主日礼拝メッセージ要旨") as mock_llm, \
+             patch("pdf_split_autorenamer.analyze._try_llm_vision", return_value="2026-04-06\n請求書") as mock_llm, \
              patch("pdf_split_autorenamer.analyze.write_ocr_cache"), \
              patch("pdf_split_autorenamer.analyze.render_thumb"):
             mock_fitz.open.return_value = fake_doc
@@ -320,11 +320,11 @@ class TestTryLlmVision:
         from pdf_split_autorenamer.analyze import _try_llm_vision
         mock_backend = MagicMock()
         mock_backend.is_available.return_value = True
-        mock_backend.extract_structured.return_value = {"date": "2026-04-06", "title": "週報"}
+        mock_backend.extract_structured.return_value = {"date": "2026-04-06", "title": "議事録"}
         with patch("pdf_split_autorenamer.analyze.ClaudeVisionBackend", return_value=mock_backend):
             result = _try_llm_vision(b"fake_image")
         assert "2026-04-06" in result
-        assert "週報" in result
+        assert "議事録" in result
 
     def test_returns_empty_when_not_available(self):
         """ClaudeVisionBackend が利用不可なら空文字列を返す"""

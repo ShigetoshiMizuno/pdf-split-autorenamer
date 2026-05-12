@@ -92,10 +92,10 @@ class TestExtractDatesAll:
 
 class TestExtractKind:
     def test_weekly_bulletin_title(self):
-        assert extract_kind("週報\n2026年4月6日") == "週報"
+        assert extract_kind("議事録\n2026年4月6日") == "議事録"
 
     def test_accounting_report(self):
-        assert extract_kind("会計報告\n2026年度") == "会計報告"
+        assert extract_kind("請求書\n2026年度") == "請求書"
 
     def test_default_kind_when_no_match(self):
         assert extract_kind("特に分類できないテキスト") == "書類"
@@ -104,16 +104,16 @@ class TestExtractKind:
         assert extract_kind("no match", default_kind="未分類") == "未分類"
 
     def test_body_pattern_used_when_title_fails(self):
-        text = "\n\n\n\n\n\n主日礼拝メッセージ要旨"  # after 6 head lines
+        text = "\n\n\n\n\n\n請求"  # after 6 head lines
         result = extract_kind(text)
-        assert result == "主日礼拝メッセージ要旨"
+        assert result == "請求書"
 
     def test_body_only_pattern_after_six_non_matching_lines(self):
-        # "祈祷会" is in DEFAULT_BODY_PATTERNS but not in DEFAULT_TITLE_PATTERNS.
-        # Putting it after 6 non-empty non-matching lines forces the body branch (line 137).
-        lines = ["行1", "行2", "行3", "行4", "行5", "行6", "祈祷会"]
+        # "連絡" is in DEFAULT_BODY_PATTERNS but not in DEFAULT_TITLE_PATTERNS.
+        # Putting it after 6 non-empty non-matching lines forces the body branch.
+        lines = ["行1", "行2", "行3", "行4", "行5", "行6", "連絡"]
         result = extract_kind("\n".join(lines))
-        assert result == "祈祷会"
+        assert result == "通知書"
 
 
 class TestSanitizeFilename:

@@ -222,6 +222,64 @@ def build_initial_groups(pages: list[dict],
     return groups
 
 
+def generate_candidate_names(
+    pages: list[dict],
+    groups: dict[str, list[dict]],
+    *,
+    profile_patterns: tuple | None = None,
+) -> dict[str, list[dict]]:
+    """各グループの先頭ページから候補ファイル名を生成し、name フィールドに埋める。
+
+    書類サマリー = カテゴリ[-取引先][-文書番号] の追加方式で組み立てる。
+    build_initial_groups は触らず、groups に in-place で name を書き込む。
+    """
+    # ページを (pdf, page番号) でインデックス
+    page_index: dict[tuple[str, int], dict] = {
+        (p["pdf"], p["page"]): p for p in pages
+    }
+
+    if profile_patterns is not None:
+        title_patterns, body_patterns = profile_patterns
+    else:
+        title_patterns = None
+        body_patterns = None
+
+    for pdf, grp_list in groups.items():
+        for grp in grp_list:
+            start_page = grp["range"][0]
+            page = page_index.get((pdf, start_page))
+            text = page["text"] if page else ""
+
+            # 日付抽出
+            date = textops.date_from_string(text)
+            if not date:
+                candidates = textops.extract_dates_all(text)
+                date = candidates[0] if candidates else None
+
+            # カテゴリ
+            kind = textops.extract_kind(
+                text,
+                title_patterns=title_patterns,
+                body_patterns=body_patterns,
+            )
+
+            # 取引先・文書番号
+            vendor = textops.extract_vendor(text)
+            docno = textops.extract_doc_number(text)
+
+            # サマリー組み立て（追加方式）
+            summary = kind
+            if vendor:
+                summary += "-" + vendor
+            if docno:
+                summary += "-" + docno
+
+            name = f"{date or '日付不明'}_{summary}"
+            grp["name"] = textops.sanitize_filename(name, max_length=80)
+
+    return groups
+
+
 def build_boundary_info(pages: list[dict]) -> list[dict]:
     info: list[dict] = []
     for i in range(1, len(pages)):
@@ -442,7 +500,7 @@ function render() {
       const input = document.createElement('input');
       input.type = 'text';
       input.value = names.get(nameKey) || '';
-      input.placeholder = '例) 2026-04-06_主日礼拝';
+      input.placeholder = '例) 2026-04-01_請求書-山田工業-2026-0401-001';
       input.oninput = (e) => {
         names.set(nameKey, e.target.value);
         const sib = nameWrap.nextElementSibling;
@@ -557,9 +615,12 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
                 pdftotext_path: str | None = None,
                 title: str = "PDF 分割レビュー",
                 ocr_fallback: bool = True,
-                ocr_strategy: str = "balanced") -> dict:
+                ocr_strategy: str = "balanced",
+                profile: Path | None = None) -> dict:
     """src_dir 配下のPDFを解析し、サムネ・groups.json・report.html を work_dir に出力。
     既に groups.json がある場合は上書きせず初期案を groups.initial.json に保存。
+
+    profile: 用語集 TOML のパス。None の場合はデフォルトパターンを使用。
 
     issue #35: src_dir が PDF ファイル単体を指している場合は、その親ディレクトリを
     src_dir として扱い、対象 PDF を 1 件だけにフィルタする。
@@ -593,6 +654,15 @@ def run_analyze(src_dir: Path, work_dir: Path | None = None,
         return {"pages": 0, "groups": 0}
     boundaries = build_boundary_info(pages)
     groups = build_initial_groups(pages)
+
+    # プロファイル読み込みと候補名生成
+    profile_patterns: tuple | None = None
+    if profile is not None:
+        try:
+            profile_patterns = textops.load_profile(Path(profile))
+        except Exception as e:
+            logging.warning("プロファイル読み込み失敗: %s: %s", profile, e)
+    groups = generate_candidate_names(pages, groups, profile_patterns=profile_patterns)
 
     out_json = work_dir / "groups.json"
     if out_json.exists():

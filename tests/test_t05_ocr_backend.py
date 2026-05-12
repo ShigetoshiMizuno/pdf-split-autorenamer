@@ -406,14 +406,14 @@ class TestClaudeVisionBackend:
         mock_client = MagicMock()
         fake_anthropic.Anthropic.return_value = mock_client
         mock_message = MagicMock()
-        mock_message.content = [MagicMock(text='{"date": "2026-05-11", "title": "週報"}')]
+        mock_message.content = [MagicMock(text='{"date": "2026-05-11", "title": "議事録"}')]
         mock_client.messages.create.return_value = mock_message
         monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
         from pdf_split_autorenamer.ocr_backend import ClaudeVisionBackend
         backend = ClaudeVisionBackend(api_key="test-key")
         result = backend.extract_structured(b"fake_image")
         assert result["date"] == "2026-05-11"
-        assert result["title"] == "週報"
+        assert result["title"] == "議事録"
 
     def test_extract_structured_exception_returns_default(self, monkeypatch):
         """構造化 API で例外が発生した場合はデフォルト dict"""
@@ -504,9 +504,9 @@ class TestOcrStrategy:
 class TestValidateStructuredOutput:
     def test_valid_dict_passthrough(self):
         from pdf_split_autorenamer.ocr_backend import validate_structured_output
-        result = validate_structured_output({"date": "2026-05-11", "title": "週報"})
+        result = validate_structured_output({"date": "2026-05-11", "title": "議事録"})
         assert result["date"] == "2026-05-11"
-        assert result["title"] == "週報"
+        assert result["title"] == "議事録"
 
     def test_invalid_date_replaced_with_none(self):
         from pdf_split_autorenamer.ocr_backend import validate_structured_output
@@ -548,7 +548,7 @@ class TestPaddleOCRBackend:
         fake_ocr_instance.ocr.return_value = [
             [
                 [[0, 0, 1, 1], ("2026年4月6日", 0.99)],
-                [[0, 20, 1, 40], ("主日礼拝", 0.95)],
+                [[0, 20, 1, 40], ("請求書", 0.95)],
             ]
         ]
         monkeypatch.setitem(sys.modules, "paddleocr", fake_paddle_mod)
@@ -556,7 +556,7 @@ class TestPaddleOCRBackend:
         backend = PaddleOCRBackend()
         result = backend.extract_text(b"fake_image")
         assert "2026年4月6日" in result
-        assert "主日礼拝" in result
+        assert "請求書" in result
 
     def test_extract_text_empty_result(self, monkeypatch):
         """OCR 結果が空の場合は空文字を返す"""
@@ -623,7 +623,7 @@ class TestEasyOCRBackend:
         fake_easyocr = MagicMock()
         fake_reader = MagicMock()
         fake_easyocr.Reader.return_value = fake_reader
-        fake_reader.readtext.return_value = ["2026年4月6日", "主日礼拝"]
+        fake_reader.readtext.return_value = ["2026年4月6日", "請求書"]
         monkeypatch.setitem(sys.modules, "easyocr", fake_easyocr)
         with patch("tempfile.NamedTemporaryFile") as mock_tmpfile, \
              patch("os.unlink"):
@@ -635,7 +635,7 @@ class TestEasyOCRBackend:
             backend = EasyOCRBackend()
             result = backend.extract_text(b"fake_image")
         assert "2026年4月6日" in result
-        assert "主日礼拝" in result
+        assert "請求書" in result
 
     def test_extract_text_exception_returns_empty(self, monkeypatch):
         """OCR 実行時に例外が発生した場合は空文字を返す"""

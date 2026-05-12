@@ -1,30 +1,78 @@
-# 一般業務書類用プロファイル（サンプル）
+# 一般業務書類用プロファイル
 name = "business"
 
 [[title_patterns]]
-pattern = "請求書"
+pattern = "請求書|御請求書"
 label = "請求書"
 
 [[title_patterns]]
-pattern = "見積書|見積もり"
+pattern = "見積書|御見積書"
 label = "見積書"
 
 [[title_patterns]]
-pattern = "契約書"
+pattern = "注文書|発注書"
+label = "発注書"
+
+[[title_patterns]]
+pattern = "領収書|受領書"
+label = "領収書"
+
+[[title_patterns]]
+pattern = "業務委託契約書|契約書"
 label = "契約書"
 
 [[title_patterns]]
-pattern = "議事録"
+pattern = "議事録|会議録"
 label = "議事録"
+
+[[title_patterns]]
+pattern = "稟議書"
+label = "稟議書"
+
+[[title_patterns]]
+pattern = "出張報告書"
+label = "出張報告書"
 
 [[title_patterns]]
 pattern = "報告書"
 label = "報告書"
 
-[[body_patterns]]
+[[title_patterns]]
+pattern = "通知書|案内"
+label = "通知書"
+
+[[title_patterns]]
 pattern = "納品書"
 label = "納品書"
 
 [[body_patterns]]
-pattern = "領収書"
+pattern = "請求"
+label = "請求書"
+
+[[body_patterns]]
+pattern = "見積"
+label = "見積書"
+
+[[body_patterns]]
+pattern = "注文|発注"
+label = "発注書"
+
+[[body_patterns]]
+pattern = "領収"
 label = "領収書"
+
+[[body_patterns]]
+pattern = "契約"
+label = "契約書"
+
+[[body_patterns]]
+pattern = "議事"
+label = "議事録"
+
+[[body_patterns]]
+pattern = "報告"
+label = "報告書"
+
+[[body_patterns]]
+pattern = "お知らせ|連絡"
+label = "通知書"

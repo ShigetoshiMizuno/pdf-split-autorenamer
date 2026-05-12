@@ -20,7 +20,7 @@ python scripts/run_benchmark.py <PDFフォルダ> --stages 1 2
 ```
 
 > **注**: サンプル PDF は `.gitignore` の `*.pdf` パターンで追跡対象外。
-> 実際の計測には実際の教会文書 PDF を `<PDFフォルダ>` に配置してください。
+> 実際の計測には実際の業務文書 PDF を `<PDFフォルダ>` に配置してください。
 
 ## ステージ定義
 
@@ -76,7 +76,7 @@ python scripts/run_benchmark.py <PDFフォルダ> --stages 1 2
 
 ```
 --ocr-strategy fast      → テキスト層あり PDF のみを扱う場合（Stage 1 のみ）
---ocr-strategy balanced  → 通常の教会文書（Stage 1 → Stage 2 フォールバック）
+--ocr-strategy balanced  → 通常の業務文書（Stage 1 → Stage 2 フォールバック）
 --ocr-strategy roi       → スキャン PDF が多い場合（Stage 1 → Stage 2 強制）
 --ocr-strategy llm       → 手書き・縦書き・低解像度スキャン（Stage 1→2→3 全試行）
 ```

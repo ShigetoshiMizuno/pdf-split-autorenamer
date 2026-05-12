@@ -112,15 +112,14 @@ class TestDefaultMojibakeCoversKanVariants:
 # ---------------------------------------------------------------------------
 
 class TestDefaultTitlePatternSimplified:
-    def test_kangei_pattern_matches_kangei_only(self):
-        """DEFAULT_TITLE_PATTERNS の歓迎パターンが 歓迎 にマッチする"""
+    def test_invoice_pattern_matches_invoice(self):
+        """DEFAULT_TITLE_PATTERNS の請求書パターンが 請求書 にマッチする"""
         from pdf_split_autorenamer.textops import DEFAULT_TITLE_PATTERNS
-        import re
-        kangei_patterns = [
+        invoice_patterns = [
             pat for pat, label in DEFAULT_TITLE_PATTERNS
-            if label == "週報" and pat.search("歓迎")
+            if label == "請求書" and pat.search("請求書")
         ]
-        assert len(kangei_patterns) >= 1, "週報にマッチする歓迎パターンが DEFAULT_TITLE_PATTERNS にない"
+        assert len(invoice_patterns) >= 1, "請求書にマッチするパターンが DEFAULT_TITLE_PATTERNS にない"
 
     def test_no_ocr_variant_in_patterns(self):
         """DEFAULT_TITLE_PATTERNS に OCR 化け変体が直接含まれないこと"""
@@ -138,18 +137,18 @@ class TestDefaultTitlePatternSimplified:
 # ---------------------------------------------------------------------------
 
 class TestExtractKindAfterMojibake:
-    @pytest.mark.parametrize("text", [
-        "歓迎",
-        "歎迎",  # fix_mojibake で 歓迎 に正規化される
-        "藪迎",
-        "裁迎",
-        "鐵迎",
-        "欽迎",
-        "歓迁",  # 迁→迎 で 歓迎 に
-        "藪迁",  # 両方変換で 歓迎 に
+    @pytest.mark.parametrize("text,expected", [
+        ("請求書", "請求書"),
+        ("御請求書", "請求書"),
+        ("見積書", "見積書"),
+        ("議事録", "議事録"),
+        ("稟議書", "稟議書"),
+        ("領収書", "領収書"),
+        ("納品書", "納品書"),
+        ("通知書", "通知書"),
     ])
-    def test_ocr_variants_classified_as_shukuho(self, text):
-        """OCR 誤読の変体テキストが 週報 と判定される"""
+    def test_business_documents_classified(self, text, expected):
+        """業務書類の代表的なキーワードが正しく分類される"""
         from pdf_split_autorenamer.textops import extract_kind
         result = extract_kind(text)
-        assert result == "週報", f"'{text}' → 週報 ではなく {result!r} になった"
+        assert result == expected, f"'{text}' → {expected!r} ではなく {result!r} になった"

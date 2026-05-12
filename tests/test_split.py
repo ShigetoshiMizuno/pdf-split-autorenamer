@@ -44,13 +44,13 @@ class TestNormalizeGroups:
         """新スキーマ（list of {range: [from, to], name: str}）がそのまま維持される"""
         raw = {
             "file.pdf": [
-                {"range": [1, 3], "name": "週報"},
+                {"range": [1, 3], "name": "議事録"},
                 {"range": [4, 6], "name": "会計報告"},
             ]
         }
         result = normalize_groups(raw)
         assert result["file.pdf"] == [
-            {"range": [1, 3], "name": "週報"},
+            {"range": [1, 3], "name": "議事録"},
             {"range": [4, 6], "name": "会計報告"},
         ]
 
@@ -85,13 +85,13 @@ class TestNormalizeGroups:
         """複数の PDF キーを持つ dict が正規化される"""
         raw = {
             "a.pdf": [[1, 2]],
-            "b.pdf": [{"range": [1, 3], "name": "週報"}],
+            "b.pdf": [{"range": [1, 3], "name": "議事録"}],
         }
         result = normalize_groups(raw)
         assert "a.pdf" in result
         assert "b.pdf" in result
         assert result["a.pdf"][0]["range"] == [1, 2]
-        assert result["b.pdf"][0]["name"] == "週報"
+        assert result["b.pdf"][0]["name"] == "議事録"
 
     def test_empty_dict_returns_empty_dict(self):
         """空の dict を渡すと空の dict を返す"""
@@ -151,8 +151,8 @@ class TestSanitizeFilename:
 
     def test_normal_japanese_name_unchanged(self):
         """禁止文字がない日本語ファイル名はそのまま返る"""
-        result = sanitize_filename("週報2026年4月")
-        assert result == "週報2026年4月"
+        result = sanitize_filename("議事録2026年4月")
+        assert result == "議事録2026年4月"
 
     def test_max_length_80(self):
         """デフォルト max_length=80 で切り詰められる"""
@@ -242,11 +242,11 @@ class TestRunSplit:
         src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
         _write_groups_json(
             tmp_path / ".psar",
-            {"source.pdf": [{"range": [1, 1], "name": "週報"}]},
+            {"source.pdf": [{"range": [1, 1], "name": "議事録"}]},
         )
         result = run_split(tmp_path)
         assert result["files_written"] == 1
-        assert (tmp_path / "source_01_週報.pdf").exists()
+        assert (tmp_path / "source_01_議事録.pdf").exists()
 
     def test_split_accepts_single_pdf_path(self, tmp_path):
         """issue #35: src_dir に PDF ファイルパスを渡しても親ディレクトリで動作する"""

@@ -58,7 +58,7 @@ class TestT04b_KeepCharsRemoved:
     def test_sanitize_filename_still_works(self):
         """_KEEP_CHARS 削除後も sanitize_filename は正常に動作する"""
         from pdf_split_autorenamer.textops import sanitize_filename
-        assert sanitize_filename("2026-04-06 主日礼拝") == "2026-04-06_主日礼拝"
+        assert sanitize_filename("2026-04-06 請求書") == "2026-04-06_請求書"
         assert sanitize_filename('abc<>:"/\\|?*def') == "abcdef"
         assert sanitize_filename("") == ""
 
