@@ -7,9 +7,10 @@ import json
 import logging
 import os
 import re
-import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
+
+from ._subprocess_utils import run_silent
 
 try:
     import tomllib
@@ -57,7 +58,7 @@ class TesseractBackend(OcrBackend):
             return ""
         cmd = [self._exe, "stdin", "stdout", "-l", lang, "--psm", "3"]
         try:
-            result = subprocess.run(
+            result = run_silent(
                 cmd,
                 input=image_bytes,
                 capture_output=True,

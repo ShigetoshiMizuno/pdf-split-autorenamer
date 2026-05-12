@@ -193,7 +193,7 @@ class TestExtractTextTesseract:
         fake_proc.returncode = 1
 
         with patch("pdf_split_autorenamer.pdfio.find_tesseract", return_value="/usr/bin/tesseract"), \
-             patch("pdf_split_autorenamer.pdfio.subprocess.run", return_value=fake_proc), \
+             patch("pdf_split_autorenamer.pdfio.run_silent", return_value=fake_proc), \
              patch("pdf_split_autorenamer.pdfio.logging.warning") as mock_warn:
             result = pdfio.extract_text_tesseract(b"fake image bytes")
 
