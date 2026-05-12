@@ -201,8 +201,23 @@ class App(tk.Tk):
                     return p
                 if p.is_file() and p.suffix.lower() == ".pdf":
                     return p
-            else:
-                return list(self._input_paths)
+                # issue #58: 単一だが無効（削除済み等）→ silent fallthrough を回避
+                messagebox.showerror(
+                    "エラー", f"選択されたパスが見つかりません: {p}"
+                )
+                return None
+            # 複数: 有効な PDF のみフィルタ
+            valid = [
+                p for p in self._input_paths
+                if p.is_file() and p.suffix.lower() == ".pdf"
+            ]
+            if not valid:
+                # issue #58: 全て無効 → silent fallthrough を回避
+                messagebox.showerror(
+                    "エラー", "選択された PDF ファイルが見つかりません。"
+                )
+                return None
+            return valid
 
         # フォールバック: folder_var の文字列から判断
         v = self.folder_var.get().strip()
