@@ -23,6 +23,14 @@ from . import analyze as _analyze
 from . import inapp_editor as _inapp
 from . import split as _split
 
+try:
+    import tkinterdnd2
+    _BaseApp = tkinterdnd2.TkinterDnD.Tk
+    _DND_AVAILABLE = True
+except ImportError:
+    _BaseApp = tk.Tk
+    _DND_AVAILABLE = False
+
 
 class _TextHandler(logging.Handler):
     """logging のメッセージを Tkinter の Text ウィジェットに転送するハンドラ"""
@@ -40,7 +48,7 @@ class _TextHandler(logging.Handler):
         self._widget.see("end")
 
 
-class App(tk.Tk):
+class App(_BaseApp):
     def __init__(self, initial_folder: str | None = None):
         super().__init__()
         self.title("pdf-split-autorenamer")
@@ -63,6 +71,7 @@ class App(tk.Tk):
         ttk.Label(top, text="PDFフォルダ／ファイル:").pack(side="left")
         ent = ttk.Entry(top, textvariable=self.folder_var)
         ent.pack(side="left", fill="x", expand=True, padx=(6, 6))
+        self._register_dnd(ent)
         # issue #48: 2 ボタンを Menubutton（ドロップダウン）に統合
         browse_menu = tk.Menu(self, tearoff=False)
         browse_menu.add_command(label="PDF を選ぶ（複数選択可）…",
@@ -125,6 +134,50 @@ class App(tk.Tk):
         self.status_var = tk.StringVar(value="待機中")
         ttk.Label(self, textvariable=self.status_var, relief="sunken",
                   anchor="w", padding=4).pack(fill="x", side="bottom")
+
+    # ----- D&D -----
+    def _register_dnd(self, widget) -> None:
+        """issue #47: ウィジェットを D&D ドロップターゲットとして登録する。
+
+        _DND_AVAILABLE=False（tkinterdnd2 未インストール）の場合は何もしない。
+        """
+        if not _DND_AVAILABLE:
+            return
+        widget.drop_target_register("DND_Files")
+        widget.dnd_bind("<<Drop>>", self._on_drop)
+
+    def _on_drop(self, event) -> None:
+        """issue #47: D&D ドロップイベントを処理して _input_paths と folder_var を更新する。
+
+        event.data の形式（tkinterdnd2）:
+          - 単一: C:/path/to/file.pdf
+          - 複数またはスペース含み: {C:/path with space.pdf} {C:/another.pdf}
+
+        self.tk.splitlist を使ってパースする（tk 組み込み機能で堅牢）。
+        """
+        raw = event.data
+        paths = [Path(p) for p in self.tk.splitlist(raw) if p]
+
+        if not paths:
+            return
+
+        if len(paths) == 1:
+            p = paths[0]
+            # PDF 以外の単一ファイル: エラーを表示して状態変更なし
+            if p.is_file() and p.suffix.lower() != ".pdf":
+                messagebox.showerror(
+                    "エラー",
+                    f"PDF ファイルまたはフォルダをドロップしてください: {p.name}"
+                )
+                return
+            # 単一 PDF またはフォルダ
+            self._input_paths = [p]
+            self.folder_var.set(str(p))
+        else:
+            # 複数パス（PDF・フォルダ混在も含む、B 案警告に委ねる）
+            self._input_paths = paths
+            first = paths[0].name
+            self.folder_var.set(f"({len(paths)} ファイル) {first} 他 {len(paths) - 1} 件")
 
     # ----- イベント -----
     def _on_browse(self) -> None:
