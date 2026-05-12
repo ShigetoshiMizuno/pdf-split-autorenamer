@@ -206,17 +206,27 @@ class App(tk.Tk):
                     "エラー", f"選択されたパスが見つかりません: {p}"
                 )
                 return None
-            # 複数: 有効な PDF のみフィルタ
+            # 複数: 有効な PDF とディレクトリに分けてチェック
             valid = [
                 p for p in self._input_paths
                 if p.is_file() and p.suffix.lower() == ".pdf"
             ]
+            dirs = [p for p in self._input_paths if p.is_dir()]
             if not valid:
                 # issue #58: 全て無効 → silent fallthrough を回避
                 messagebox.showerror(
                     "エラー", "選択された PDF ファイルが見つかりません。"
                 )
                 return None
+            # issue #63: ディレクトリと PDF が混在 → 確認ダイアログ（B 案）
+            if dirs:
+                ok = messagebox.askokcancel(
+                    "警告",
+                    f"ディレクトリ {len(dirs)} 件が含まれています。\n"
+                    "ディレクトリを除外して PDF のみ処理しますか？",
+                )
+                if not ok:
+                    return None
             return valid
 
         # フォールバック: folder_var の文字列から判断
