@@ -766,7 +766,11 @@ class TestMenubuttonInput:
         with patch.object(gui_module.messagebox, "askokcancel", return_value=True) as mok, \
              patch.object(app, "update_idletasks", return_value=None):
             app._get_inputs()
-        mok.assert_called_once()
+        mok.assert_called_once_with(
+            "警告",
+            "ディレクトリ 1 件が含まれています。\n"
+            "ディレクトリを除外して PDF のみ処理しますか？",
+        )
 
     def test_get_inputs_mixed_dir_pdf_continue_returns_pdfs_only(self, tmp_path):
         """issue #63: 混在 + 続行（OK=True）→ PDF のみ返ること"""
