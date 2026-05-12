@@ -27,10 +27,23 @@ def _setup_logging(verbose: bool = False, quiet: bool = False) -> None:
 def cmd_analyze(args: argparse.Namespace) -> int:
     _setup_logging(args.verbose, args.quiet)
     from . import analyze
-    src = Path(args.folder).resolve()
-    if not src.is_dir():
-        logging.error("ディレクトリが存在しません: %s", src)
+
+    # issue #48: inputs は nargs="+" で list[str] になる
+    raw_inputs = getattr(args, "inputs", None) or [getattr(args, "folder", "")]
+    resolved = [Path(i).resolve() for i in raw_inputs]
+
+    # 単一フォルダ or 複数ファイル/フォルダ の判定
+    if len(resolved) == 1 and resolved[0].is_dir():
+        src: Path | list[Path] = resolved[0]
+        print(f"PDF を解析中: {src}")
+    elif len(resolved) == 1 and not resolved[0].exists():
+        logging.error("ディレクトリが存在しません: %s", resolved[0])
         return 2
+    else:
+        # 複数指定または単一ファイルの場合
+        src = resolved
+        print(f"PDF を解析中: {len(resolved)} 件")
+
     if getattr(args, "ocr_strategy", "balanced") == "llm" and not getattr(args, "yes", False):
         msg = (
             "警告: --ocr-strategy llm を使用すると、PDF ページ画像が"
@@ -47,7 +60,6 @@ def cmd_analyze(args: argparse.Namespace) -> int:
             logging.warning("%s --yes を付けると確認をスキップできます。", msg)
     work = Path(args.work_dir).resolve() if args.work_dir else None
     profile = Path(args.profile).resolve() if getattr(args, "profile", None) else None
-    print(f"PDF を解析中: {src}")
     res = analyze.run_analyze(src, work_dir=work, pdftotext_path=args.pdftotext,
                               title=args.title,
                               ocr_fallback=not args.no_ocr_fallback,
@@ -66,7 +78,16 @@ def cmd_analyze(args: argparse.Namespace) -> int:
 def cmd_split(args: argparse.Namespace) -> int:
     _setup_logging(args.verbose, args.quiet)
     from . import split
-    src = Path(args.folder).resolve()
+
+    # issue #48: inputs は nargs="+" で list[str] になる
+    raw_inputs = getattr(args, "inputs", None) or [getattr(args, "folder", "")]
+    resolved = [Path(i).resolve() for i in raw_inputs]
+
+    if len(resolved) == 1 and resolved[0].is_dir():
+        src: Path | list[Path] = resolved[0]
+    else:
+        src = resolved
+
     work = Path(args.work_dir).resolve() if args.work_dir else None
     try:
         res = split.run_split(src, work_dir=work, dry_run=args.dry_run, force=args.force)
@@ -160,7 +181,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("analyze", help="PDFを解析してHTMLレポートを生成")
-    sp.add_argument("folder", help="PDFが入っているフォルダ")
+    sp.add_argument("inputs", nargs="+",
+                    help="解析対象: PDFフォルダ、または PDF ファイルを複数指定")
     sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
     sp.add_argument("--pdftotext", help="pdftotext.exe のパス (省略時は自動検出)")
     sp.add_argument("--title", default="PDF 分割レビュー", help="HTMLレポートのタイトル")
@@ -177,7 +199,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(func=cmd_analyze)
 
     sp = sub.add_parser("split", help="保存済み分割設定に従って分割を実行")
-    sp.add_argument("folder", help="PDFが入っているフォルダ")
+    sp.add_argument("inputs", nargs="+",
+                    help="分割対象: PDFフォルダ、または PDF ファイルを複数指定")
     sp.add_argument("--work-dir", help="作業ファイル格納先 (既定: <folder>/.psar)")
     sp.add_argument("--dry-run", action="store_true", help="計画のみ表示")
     sp.add_argument("--force", action="store_true", help="既存ファイルを上書き")

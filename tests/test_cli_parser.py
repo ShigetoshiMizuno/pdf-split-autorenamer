@@ -40,10 +40,10 @@ class TestBuildParser:
 
 class TestAnalyzeParser:
     def test_analyze_folder_arg(self):
-        """analyze サブコマンドで folder 引数が取得できる"""
+        """analyze サブコマンドで inputs 引数が取得できる (issue #48: nargs="+")"""
         p = build_parser()
         args = p.parse_args(["analyze", "./folder"])
-        assert args.folder == "./folder"
+        assert args.inputs == ["./folder"]
 
     def test_analyze_no_ocr_fallback_default_false(self):
         """--no-ocr-fallback のデフォルトは False"""
@@ -124,10 +124,10 @@ class TestAnalyzeParser:
 
 class TestSplitParser:
     def test_split_folder_arg(self):
-        """split サブコマンドで folder 引数が取得できる"""
+        """split サブコマンドで inputs 引数が取得できる (issue #48: nargs="+")"""
         p = build_parser()
         args = p.parse_args(["split", "./folder"])
-        assert args.folder == "./folder"
+        assert args.inputs == ["./folder"]
 
     def test_split_dry_run_default_false(self):
         """--dry-run のデフォルトは False"""

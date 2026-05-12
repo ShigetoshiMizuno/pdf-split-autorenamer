@@ -49,7 +49,7 @@ def _validate_groups(pdf_name: str, items: list[dict], page_count: int) -> None:
         logger.info("[%s] 未カバーページ（出力なし）: %s", pdf_name, uncovered)
 
 
-def run_split(src_dir: Path, work_dir: Path | None = None,
+def run_split(src_dir: Path | list[Path], work_dir: Path | None = None,
               dry_run: bool = False, force: bool = False) -> dict:
     """work_dir/groups.json に基づいて src_dir のPDFを分割。
 
@@ -58,12 +58,27 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
 
     issue #35: src_dir が PDF ファイル単体を指している場合はその親ディレクトリを
     src_dir として扱う（work_dir は親/.psar）。
+
+    issue #48: src_dir が list[Path] の場合は、指定された PDF ファイルのみを処理する。
+    共通の親ディレクトリを src_dir として使用する。
     """
-    src_path = Path(src_dir)
-    if src_path.is_file() and src_path.suffix.lower() == ".pdf":
-        src_dir = src_path.parent
+    if isinstance(src_dir, list):
+        pdf_paths = [Path(p) for p in src_dir]
+        if not pdf_paths:
+            return {
+                "total_input_pages": 0,
+                "total_output_pages": 0,
+                "files_written": 0,
+                "files_skipped": 0,
+                "actions": [],
+            }
+        src_dir = pdf_paths[0].parent
     else:
-        src_dir = src_path
+        src_path = Path(src_dir)
+        if src_path.is_file() and src_path.suffix.lower() == ".pdf":
+            src_dir = src_path.parent
+        else:
+            src_dir = src_path
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     groups_path = work_dir / "groups.json"
     if not groups_path.exists():

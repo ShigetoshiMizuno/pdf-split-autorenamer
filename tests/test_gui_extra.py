@@ -57,6 +57,7 @@ def _make_app(folder: str = "") -> object:
         "force_var": _BooleanVar(False),
         "status_var": _StringVar("待機中"),
         "log": MagicMock(),
+        "_input_paths": [],  # issue #48: 複数入力パスリスト
     })
     return app
 
@@ -175,19 +176,22 @@ class TestGetFolder:
 
 class TestOnBrowseFile:
     def test_browse_file_sets_path(self, tmp_path):
-        """issue #35: ファイル選択で folder_var に PDF パスがセットされる"""
+        """issue #35 / #48: ファイル選択で folder_var に PDF パスがセットされる"""
         from pdf_split_autorenamer import gui as gui_module
+        pdf = tmp_path / "a.pdf"
+        pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
         app = _make_app()
-        with patch.object(gui_module.filedialog, "askopenfilename",
-                          return_value="/tmp/a.pdf"):
+        # issue #48: _on_browse_file は _on_browse_files に委譲。askopenfilenames をパッチ
+        with patch.object(gui_module.filedialog, "askopenfilenames",
+                          return_value=(str(pdf),)):
             app._on_browse_file()
-        assert app.folder_var.get() == "/tmp/a.pdf"
+        assert app.folder_var.get() == str(pdf)
 
     def test_browse_file_cancel_keeps_existing(self):
         """ファイル選択キャンセルなら folder_var は変更されない"""
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app("/orig")
-        with patch.object(gui_module.filedialog, "askopenfilename", return_value=""):
+        with patch.object(gui_module.filedialog, "askopenfilenames", return_value=()):
             app._on_browse_file()
         assert app.folder_var.get() == "/orig"
 
@@ -201,9 +205,9 @@ class TestOnBrowseFile:
 
         def fake_open(**kwargs):
             captured.update(kwargs)
-            return ""
+            return ()
 
-        with patch.object(gui_module.filedialog, "askopenfilename", side_effect=fake_open):
+        with patch.object(gui_module.filedialog, "askopenfilenames", side_effect=fake_open):
             app._on_browse_file()
         assert captured.get("initialdir") == str(tmp_path)
 
@@ -319,7 +323,8 @@ class TestOnAnalyze:
     def test_early_return_when_no_folder(self):
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app("")
-        with patch.object(app, "_get_folder", return_value=None), \
+        # issue #48: _on_analyze は _get_inputs() を使う
+        with patch.object(app, "_get_inputs", return_value=None), \
              patch.object(app, "_run_async") as mra:
             app._on_analyze()
         mra.assert_not_called()
@@ -328,7 +333,7 @@ class TestOnAnalyze:
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
         mock_result = {"pages": 2, "groups": 1, "report_html": None, "groups_json": ""}
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
@@ -343,7 +348,7 @@ class TestOnAnalyze:
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
         mock_result = {"pages": 3, "groups": 2, "report_html": fake_html, "groups_json": ""}
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
@@ -364,7 +369,7 @@ class TestOnAnalyze:
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
         mock_result = {"pages": 3, "groups": 2, "report_html": fake_html, "groups_json": ""}
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
@@ -383,7 +388,7 @@ class TestOnAnalyze:
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
         mock_result = {"pages": 0, "groups": 0, "report_html": fake_html, "groups_json": ""}
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
@@ -401,7 +406,7 @@ class TestOnAnalyze:
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
         mock_result = {"pages": 5, "groups": 0, "report_html": fake_html, "groups_json": ""}
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
@@ -418,7 +423,7 @@ class TestOnAnalyze:
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
         mock_result = {"pages": 3, "groups": 2, "report_html": None, "groups_json": ""}
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
@@ -439,7 +444,8 @@ class TestOnOpenReport:
     def test_early_return_when_no_folder(self):
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app()
-        with patch.object(app, "_get_folder", return_value=None), \
+        # issue #48: _on_open_report は _get_inputs() を使う
+        with patch.object(app, "_get_inputs", return_value=None), \
              patch.object(gui_module, "webbrowser") as mwb:
             app._on_open_report()
         mwb.open.assert_not_called()
@@ -447,7 +453,7 @@ class TestOnOpenReport:
     def test_warning_when_report_missing(self, tmp_path):
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(gui_module.messagebox, "showwarning") as mw:
             app._on_open_report()
         mw.assert_called_once()
@@ -458,7 +464,7 @@ class TestOnOpenReport:
         psar.mkdir()
         (psar / "report.html").write_text("<html/>", encoding="utf-8")
         app = _make_app(str(tmp_path))
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(gui_module, "webbrowser") as mwb:
             app._on_open_report()
         mwb.open.assert_called_once()
@@ -472,7 +478,8 @@ class TestOnSplit:
     def test_early_return_when_no_folder(self):
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app()
-        with patch.object(app, "_get_folder", return_value=None), \
+        # issue #48: _on_split は _get_inputs() を使うので _get_inputs をモック
+        with patch.object(app, "_get_inputs", return_value=None), \
              patch.object(app, "_run_async") as mra:
             app._on_split(False)
         mra.assert_not_called()
@@ -489,7 +496,7 @@ class TestOnSplit:
             "total_output_pages": 3,
             "files_skipped": 0,
         }
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(gui_module._split, "run_split", return_value=mock_result), \
              patch.object(app, "_log", side_effect=logged.append), \
              patch.object(app, "_set_status"), \
@@ -510,7 +517,7 @@ class TestOnSplit:
             "total_output_pages": 3,
             "files_skipped": 0,
         }
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(gui_module._split, "run_split", return_value=mock_result), \
              patch.object(gui_module.messagebox, "askyesno", return_value=True), \
              patch.object(app, "_log", side_effect=logged.append), \
@@ -532,7 +539,7 @@ class TestOnSplit:
             "total_output_pages": 0,
             "files_skipped": 0,
         }
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
+        with patch.object(app, "_get_inputs", return_value=tmp_path), \
              patch.object(gui_module._split, "run_split", return_value=mock_result), \
              patch.object(gui_module.messagebox, "askyesno", return_value=False), \
              patch.object(app, "_log"), \
