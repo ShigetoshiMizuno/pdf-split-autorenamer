@@ -50,8 +50,9 @@ class TestFullWorkflow:
         )
         summary = run_split(tmp_path, work_dir=work_dir)
         assert summary["files_written"] == 2
-        assert (tmp_path / "scan_01_第1文書.pdf").exists()
-        assert (tmp_path / "scan_02_第2文書.pdf").exists()
+        # issue #52: 候補名がある分割は name のみで書き出す
+        assert (tmp_path / "第1文書.pdf").exists()
+        assert (tmp_path / "第2文書.pdf").exists()
 
     def test_split_then_rename(self, tmp_path):
         # Note: fitz insert_text may not produce extractable CJK text.

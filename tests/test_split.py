@@ -237,7 +237,7 @@ class TestRunSplit:
         assert "out-of-range" in statuses
 
     def test_split_writes_file(self, tmp_path):
-        """正常なグループ指定で PDF が書き出される"""
+        """正常なグループ指定で PDF が書き出される (issue #52: name のみ)"""
         src = tmp_path / "source.pdf"
         src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
         _write_groups_json(
@@ -246,7 +246,9 @@ class TestRunSplit:
         )
         result = run_split(tmp_path)
         assert result["files_written"] == 1
-        assert (tmp_path / "source_01_議事録.pdf").exists()
+        assert (tmp_path / "議事録.pdf").exists()
+        # 旧フォーマット（元PDF名 + 連番 prefix）は出力しないこと
+        assert not (tmp_path / "source_01_議事録.pdf").exists()
 
     def test_split_accepts_single_pdf_path(self, tmp_path):
         """issue #35: src_dir に PDF ファイルパスを渡しても親ディレクトリで動作する"""
@@ -258,7 +260,34 @@ class TestRunSplit:
         )
         result = run_split(src)  # ファイルパスを直接渡す
         assert result["files_written"] == 1
-        assert (tmp_path / "source_01_週報.pdf").exists()
+        assert (tmp_path / "週報.pdf").exists()
+
+    def test_split_omits_pdf_stem_when_name_given(self, tmp_path):
+        """issue #52: 候補名がある分割は元PDF名と連番を省く"""
+        src = tmp_path / "sample_office_scan.pdf"
+        src.write_bytes(_make_multipage_pdf(["A", "B"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"sample_office_scan.pdf": [
+                {"range": [1, 1], "name": "2026-04-01_請求書-山田工業-2026-0401-001"},
+            ]},
+        )
+        result = run_split(tmp_path)
+        assert result["files_written"] == 1
+        expected = tmp_path / "2026-04-01_請求書-山田工業-2026-0401-001.pdf"
+        assert expected.exists()
+
+    def test_split_keeps_stem_when_name_empty(self, tmp_path):
+        """issue #52: 候補名がないときは従来通り <stem>_NN.pdf を維持"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["A", "B"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 2], "name": ""}]},
+        )
+        result = run_split(tmp_path)
+        assert result["files_written"] == 1
+        assert (tmp_path / "source_01.pdf").exists()
 
     def test_skip_existing_without_force(self, tmp_path):
         """既存ファイルがある場合 force=False でスキップされる"""
