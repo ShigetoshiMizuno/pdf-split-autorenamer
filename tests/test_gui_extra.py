@@ -741,10 +741,11 @@ class TestMenubuttonInput:
         ghost = tmp_path / "missing.pdf"
         app = _make_app("")
         app._input_paths = [pdf_ok, ghost]
-        with patch.object(gui_module.messagebox, "showerror"), \
+        with patch.object(gui_module.messagebox, "showerror") as me, \
              patch.object(app, "update_idletasks", return_value=None):
             result = app._get_inputs()
         assert result == [pdf_ok]
+        me.assert_not_called()
 
 
 class TestMain:
