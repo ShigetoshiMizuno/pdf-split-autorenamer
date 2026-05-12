@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """Tkinter GUI
 
-3ステップを画面上のボタンで進めるシンプルなUI。
+2ステップを画面上のボタンで進めるシンプルなUI。
 - フォルダ選択
 - [解析] → サムネ・HTMLレポート生成 → ブラウザで自動オープン
-- [分割 dry-run] / [分割 実行] → groups.json から分割
-- [リネーム dry-run] / [リネーム 実行] → 内容ベース自動命名
+- [分割 dry-run] / [分割 実行] → groups.json から分割（命名は編集ウィンドウで決定）
+
+issue #40: かつての Step 3 「自動リネーム」は Step 2 分割に取り込まれた。
+CLI の `psar rename` は引き続き利用可能。
 """
 from __future__ import annotations
 
@@ -19,7 +21,6 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import analyze as _analyze
 from . import inapp_editor as _inapp
-from . import rename as _rename
 from . import split as _split
 
 
@@ -47,9 +48,7 @@ class App(tk.Tk):
         self.minsize(640, 480)
 
         self.folder_var = tk.StringVar(value=initial_folder or "")
-        self.rename_mode_var = tk.StringVar(value="split")
         self.force_var = tk.BooleanVar(value=False)
-        self.profile_var = tk.StringVar()
 
         self._build_ui()
 
@@ -58,12 +57,13 @@ class App(tk.Tk):
 
         top = ttk.Frame(self, padding=8)
         top.pack(fill="x")
-        ttk.Label(top, text="PDFフォルダ:").pack(side="left")
+        ttk.Label(top, text="PDFフォルダ／ファイル:").pack(side="left")
         ent = ttk.Entry(top, textvariable=self.folder_var)
         ent.pack(side="left", fill="x", expand=True, padx=(6, 6))
-        ttk.Button(top, text="参照…", command=self._on_browse).pack(side="left")
+        ttk.Button(top, text="フォルダ…", command=self._on_browse).pack(side="left")
+        ttk.Button(top, text="ファイル…", command=self._on_browse_file).pack(side="left", padx=(4, 0))
 
-        # 操作パネル: 3つのフレームを並べる
+        # 操作パネル: 2つのフレームを並べる
         body = ttk.Frame(self, padding=8)
         body.pack(fill="x")
 
@@ -75,7 +75,7 @@ class App(tk.Tk):
                   text="押すと内容を読み取り、続けて編集ウィンドウが開きます").pack(
             side="left", padx=12)
 
-        # Step 2: 分割
+        # Step 2: 分割（編集ウィンドウで決めた候補名でそのまま書き出す）
         f2 = ttk.LabelFrame(body, text="2. 分割（編集した内容に従って書類ごとに切り出し）", padding=8)
         f2.pack(fill="x", **pad)
         ttk.Button(f2, text="実行", command=lambda: self._on_split(True)).pack(side="left")
@@ -88,40 +88,6 @@ class App(tk.Tk):
         self._split_advanced_frame = ttk.Frame(body)  # 折りたたみコンテンツ
         ttk.Button(self._split_advanced_frame, text="変更内容を確認するだけ（実行しない）",
                    command=lambda: self._on_split(False)).pack(side="left", padx=8)
-
-        # Step 3: リネーム
-        f3 = ttk.LabelFrame(body, text="3. 自動リネーム（内容から日付・書類タイプを決めて命名）", padding=8)
-        f3.pack(fill="x", **pad)
-        f3_row1 = ttk.Frame(f3)
-        f3_row1.pack(fill="x")
-        ttk.Button(f3_row1, text="実行", command=lambda: self._on_rename(True)).pack(side="left")
-        # 詳細オプション（折りたたみ）
-        self._rename_advanced_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(f3_row1, text="詳細オプション", variable=self._rename_advanced_var,
-                        command=self._toggle_rename_advanced).pack(side="right")
-        self._rename_advanced_frame = ttk.Frame(body)  # 折りたたみコンテンツ
-        # モード選択
-        adv_row1 = ttk.Frame(self._rename_advanced_frame)
-        adv_row1.pack(fill="x", padx=8, pady=2)
-        ttk.Label(adv_row1, text="対象:").pack(side="left")
-        ttk.Radiobutton(adv_row1, text="分割直後のファイル", variable=self.rename_mode_var,
-                        value="split").pack(side="left", padx=4)
-        ttk.Radiobutton(adv_row1, text="既存の『日付不明_』を再判定",
-                        variable=self.rename_mode_var,
-                        value="unknown").pack(side="left", padx=4)
-        ttk.Radiobutton(adv_row1, text="両方", variable=self.rename_mode_var,
-                        value="all").pack(side="left", padx=4)
-        ttk.Button(adv_row1, text="変更内容を確認するだけ（実行しない）",
-                   command=lambda: self._on_rename(False)).pack(side="left", padx=8)
-        # プロファイル
-        adv_row2 = ttk.Frame(self._rename_advanced_frame)
-        adv_row2.pack(fill="x", padx=8, pady=2)
-        ttk.Label(adv_row2, text="命名ルール（プロファイル）:").pack(side="left")
-        ttk.Entry(adv_row2, textvariable=self.profile_var, state="readonly").pack(
-            side="left", fill="x", expand=True, padx=(6, 6))
-        ttk.Button(adv_row2, text="参照…", command=self._on_browse_profile).pack(side="left")
-        ttk.Button(adv_row2, text="クリア",
-                   command=lambda: self.profile_var.set("")).pack(side="left", padx=(4, 0))
 
         # ログエリア
         log_frame = ttk.LabelFrame(self, text="ログ", padding=4)
@@ -149,24 +115,36 @@ class App(tk.Tk):
         if d:
             self.folder_var.set(d)
 
-    def _on_browse_profile(self) -> None:
-        path = filedialog.askopenfilename(
-            title="プロファイル TOML を選択",
-            filetypes=[("TOML ファイル", "*.toml"), ("すべてのファイル", "*.*")],
+    def _on_browse_file(self) -> None:
+        """issue #35: 単一 PDF ファイルを選択可能にする。"""
+        initial = self.folder_var.get() or "."
+        if Path(initial).is_file():
+            initial = str(Path(initial).parent)
+        p = filedialog.askopenfilename(
+            title="PDF ファイルを選択",
+            initialdir=initial,
+            filetypes=[("PDF ファイル", "*.pdf"), ("すべてのファイル", "*.*")],
         )
-        if path:
-            self.profile_var.set(path)
+        if p:
+            self.folder_var.set(p)
 
     def _get_folder(self) -> Path | None:
+        """入力パスを返す。フォルダまたは PDF ファイル (issue #35)。"""
         v = self.folder_var.get().strip()
         if not v:
-            messagebox.showwarning("警告", "PDFフォルダを選択してください。")
+            messagebox.showwarning(
+                "警告", "PDFフォルダまたは PDF ファイルを選択してください。"
+            )
             return None
         p = Path(v)
-        if not p.is_dir():
-            messagebox.showerror("エラー", f"フォルダが存在しません: {p}")
-            return None
-        return p
+        if p.is_dir():
+            return p
+        if p.is_file() and p.suffix.lower() == ".pdf":
+            return p
+        messagebox.showerror(
+            "エラー", f"フォルダまたは PDF ファイルが存在しません: {p}"
+        )
+        return None
 
     def _log(self, msg: str) -> None:
         self.log.insert("end", msg + "\n")
@@ -208,28 +186,6 @@ class App(tk.Tk):
         lines.append("実行してよろしいですか？")
         return "\n".join(lines)
 
-    @staticmethod
-    def _build_rename_summary(res: dict, mode: str) -> str:
-        actions = res.get("actions", [])
-        targets = res.get("targets", 0)
-        lines = [f"対象: {targets} 件 (モード: {mode})", ""]
-        limit = 10
-        for a in actions[:limit]:
-            status = a.get("status", "")
-            old = a.get("src_display", a.get("src", ""))
-            dst = a.get("dst", "")
-            date = a.get("date") or "----"
-            kind = a.get("kind", "")
-            if status == "skip":
-                lines.append(f"  [skip]   {old}  ->  既存ファイルあり")
-            else:
-                lines.append(f"  [{status}] {old}  ->  {dst}  [{date} / {kind}]")
-        if len(actions) > limit:
-            lines.append(f"  … 他 {len(actions) - limit} 件")
-        lines.append("")
-        lines.append("実行してよろしいですか？")
-        return "\n".join(lines)
-
     # ----- 詳細オプション折りたたみ -----
     def _toggle_split_advanced(self) -> None:
         if self._split_advanced_var.get():
@@ -237,12 +193,6 @@ class App(tk.Tk):
                                             after=self._split_advanced_frame.master.winfo_children()[1])
         else:
             self._split_advanced_frame.pack_forget()
-
-    def _toggle_rename_advanced(self) -> None:
-        if self._rename_advanced_var.get():
-            self._rename_advanced_frame.pack(fill="x", padx=8, pady=(0, 4))
-        else:
-            self._rename_advanced_frame.pack_forget()
 
     # ----- アクション -----
     def _on_analyze(self) -> None:
@@ -253,38 +203,45 @@ class App(tk.Tk):
         self._set_status("解析中…")
 
         def do():
-            profile_path = self.profile_var.get().strip() or None
-            profile = Path(profile_path) if profile_path else None
-            return _analyze.run_analyze(folder, profile=profile)
+            # profile は CLI からのみ指定可能。GUI 用語集 UI は別 issue (#50) で対応予定。
+            return _analyze.run_analyze(folder)
 
         def done(res):
-            self._log(f"  ページ数: {res.get('pages', 0)}")
-            self._log(f"  初期グループ数: {res.get('groups', 0)}")
+            pages = res.get("pages", 0)
+            groups = res.get("groups", 0)
             html = res.get("report_html")
+            self._log(f"  ページ数: {pages}")
+            self._log(f"  初期グループ数: {groups}")
             self._set_status("解析完了")
-            if not html:
+
+            if pages == 0:
+                messagebox.showwarning(
+                    "解析完了",
+                    "PDF からテキストを取得できませんでした。\n"
+                    "OCR バックエンドの設定または PDF 内容をご確認ください。"
+                )
                 return
+            if groups == 0:
+                messagebox.showwarning(
+                    "解析完了",
+                    "書類グループを提案できませんでした。\n"
+                    "用語集の設定をご確認ください。"
+                )
+                return
+            if not html:
+                messagebox.showwarning(
+                    "解析完了",
+                    "レポートが生成されませんでした。\n"
+                    "ログを確認してください。"
+                )
+                return
+
             self._log(f"  レポート: {html}")
-            pages = res.get("pages")
-            groups = res.get("groups")
-            # 自動誘導: pywebview があれば確認 → アプリ内編集ウィンドウへ
+            # issue #37: 確認ダイアログなしで自動遷移。pywebview があればアプリ内、無ければブラウザ。
             if _inapp.is_available():
-                if messagebox.askyesno(
-                    "解析完了",
-                    f"ページ {pages} 件 / 書類グループ {groups} 件を提案しました。\n\n"
-                    "続けて編集ウィンドウを開いて、境界とファイル名を確認しますか？\n"
-                    "（『はい』でアプリ内に編集画面が開きます）"
-                ):
-                    self._on_inapp_edit()
+                self._on_inapp_edit()
             else:
-                # フォールバック: pywebview 未導入時はブラウザを案内
-                if messagebox.askyesno(
-                    "解析完了",
-                    f"ページ {pages} 件 / 書類グループ {groups} 件を提案しました。\n\n"
-                    "ブラウザで編集画面を開きますか？\n"
-                    "（アプリ内編集には pywebview のインストールが必要です）"
-                ):
-                    webbrowser.open(Path(html).as_uri())
+                webbrowser.open(Path(html).as_uri())
 
         self._run_async(do, done)
 
@@ -401,63 +358,6 @@ class App(tk.Tk):
                 self._log(f"  書き出し: {res2['files_written']} ファイル / {res2['total_output_pages']} ページ")
                 self._log(f"  スキップ: {res2['files_skipped']} ファイル")
                 self._set_status("分割完了")
-
-            self._run_async(do_apply, done_apply)
-
-        self._run_async(do_preview, done_preview)
-
-    def _on_rename(self, apply_: bool) -> None:
-        folder = self._get_folder()
-        if not folder:
-            return
-        mode = self.rename_mode_var.get()
-        profile_str = self.profile_var.get()
-        profile = Path(profile_str) if profile_str else None
-
-        if not apply_:
-            # dry-run ボタン: ログに流すだけ（既存動作を維持）
-            self._log(f"=== リネーム dry-run (mode={mode}) ===")
-            self._set_status("dry-run 中…")
-
-            def do_dry():
-                return _rename.run_rename(folder, mode=mode, apply=False, profile=profile)
-
-            def done_dry(res):
-                self._log(f"  対象: {res['targets']} 件")
-                for a in res["actions"]:
-                    old = a.get("src_display", a["src"])
-                    self._log(f"  [{a['status']:8}] {old}  ->  {a['dst']}  [{a.get('date') or '----'} / {a.get('kind', '')}]")
-                self._set_status("dry-run 完了")
-
-            self._run_async(do_dry, done_dry)
-            return
-
-        # 実行ボタン: まず dry-run してサマリを確認ダイアログに表示
-        self._log(f"=== リネーム dry-run (確認中…, mode={mode}) ===")
-        self._set_status("確認中…")
-
-        def do_preview():
-            return _rename.run_rename(folder, mode=mode, apply=False, profile=profile)
-
-        def done_preview(res):
-            summary = self._build_rename_summary(res, mode)
-            if not messagebox.askyesno("リネームの確認", summary):
-                self._set_status("キャンセル")
-                return
-            # 本番実行
-            self._log(f"=== リネーム 実行 (mode={mode}) ===")
-            self._set_status("リネーム中…")
-
-            def do_apply():
-                return _rename.run_rename(folder, mode=mode, apply=True, profile=profile)
-
-            def done_apply(res2):
-                self._log(f"  対象: {res2['targets']} 件")
-                for a in res2["actions"]:
-                    old = a.get("src_display", a["src"])
-                    self._log(f"  [{a['status']:8}] {old}  ->  {a['dst']}  [{a.get('date') or '----'} / {a.get('kind', '')}]")
-                self._log(f"  リネーム完了: {res2['applied']} 件")
-                self._set_status("リネーム完了")
 
             self._run_async(do_apply, done_apply)
 

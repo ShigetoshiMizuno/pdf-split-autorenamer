@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>pdf-split-autorenamer — まとめスキャンPDFを、自動で仕分け＆命名</title>
+<meta name="description" content="複合機やScanSnapで一気にスキャンしたPDFを、書類ごとに分割して『日付_書類タイプ.pdf』に自動リネーム。あなたのPCにインストールして動くローカル ツール（クラウドサービスではありません）。総務・経理・営業事務の書類整理を5分で。" />
+<meta property="og:title" content="pdf-split-autorenamer — まとめスキャンPDFを自動仕分け（ローカル動作）" />
+<meta property="og:description" content="自分のPCで動くデスクトップツール。データは社外に送信されません。GUI／CLI／OCR対応。" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://shigetoshimizuno.github.io/pdf-split-autorenamer/images/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="pdf-split-autorenamer — まとめスキャンPDFを自動で仕分け＆命名" />
+<meta property="og:url" content="https://shigetoshimizuno.github.io/pdf-split-autorenamer/" />
+<meta property="og:locale" content="ja_JP" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="pdf-split-autorenamer — まとめスキャンPDFを自動仕分け" />
+<meta name="twitter:description" content="複合機・ScanSnapで一気にスキャンしたPDFを書類ごとに分割＆命名。ローカル動作・社外送信なし。" />
+<meta name="twitter:image" content="https://shigetoshimizuno.github.io/pdf-split-autorenamer/images/og-image.png" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%232563eb'/%3E%3Ctext x='50%25' y='58%25' text-anchor='middle' font-family='sans-serif' font-size='32' font-weight='800' fill='white'%3EP%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', '"Noto Sans JP"', 'system-ui', 'sans-serif'],
+          jp:   ['"Noto Sans JP"', 'Inter', 'system-ui', 'sans-serif'],
+        },
+        colors: {
+          brand:    { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af', 900:'#1e3a8a' },
+          accent:   { 400:'#22d3ee', 500:'#06b6d4', 600:'#0891b2' },
+          ink:      { 50:'#f8fafc', 100:'#f1f5f9', 700:'#334155', 800:'#1e293b', 900:'#0f172a' }
+        }
+      }
+    }
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.mermaid) {
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose', flowchart: { curve: 'basis' }, themeVariables: { fontFamily: '"Noto Sans JP", Inter, sans-serif' } });
+    }
+  });
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .grad-hero {
+    background:
+      radial-gradient(70% 60% at 80% 0%, rgba(34,211,238,0.18), transparent 60%),
+      radial-gradient(60% 50% at 0% 0%, rgba(37,99,235,0.18), transparent 60%),
+      linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+  }
+  .glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
+  details > summary::-webkit-details-marker { display:none; }
+  details > summary { list-style: none; cursor: pointer; }
+  .bullet::before {
+    content: ""; display: inline-block; width: .55rem; height: .55rem; border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #06b6d4); margin-right: .6rem; transform: translateY(-2px);
+  }
+  .check::before { content: "✓"; color: #16a34a; font-weight: 800; margin-right: .4rem; }
+  .cross::before { content: "✗"; color: #dc2626; font-weight: 800; margin-right: .4rem; }
+  .step-num {
+    display:inline-flex; align-items:center; justify-content:center;
+    width: 36px; height: 36px; border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #06b6d4); color: white; font-weight: 800;
+  }
+  pre code { font-family: 'JetBrains Mono','Consolas','SF Mono',monospace; font-size: .85em; }
+  .scrollbar-thin::-webkit-scrollbar { height: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+  @media print { .no-print { display:none; } }
+</style>
+</head>
+<body class="bg-ink-50 text-ink-900 font-jp">
+
+<!-- Top Nav -->
+<header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200 no-print">
+  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center gap-4">
+    <a href="#top" class="flex items-center gap-2 font-extrabold text-lg">
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-600 to-accent-500 text-white">P</span>
+      <span>pdf-split-autorenamer</span>
+    </a>
+    <nav class="hidden md:flex items-center gap-5 text-sm text-slate-700 ml-4">
+      <a href="#problem" class="hover:text-brand-700">こんな業務に</a>
+      <a href="#how" class="hover:text-brand-700">3ステップ</a>
+      <a href="#tour" class="hover:text-brand-700">画面ツアー</a>
+      <a href="#ocr" class="hover:text-brand-700">OCR</a>
+      <a href="#install" class="hover:text-brand-700">導入</a>
+      <a href="#faq" class="hover:text-brand-700">FAQ</a>
+    </nav>
+    <div class="flex-1"></div>
+    <a href="https://github.com/ShigetoshiMizuno/pdf-split-autorenamer" class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-300 text-sm hover:bg-slate-100">
+      <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.92 10.92 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.18c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+      <span>GitHub</span>
+    </a>
+    <a href="https://github.com/ShigetoshiMizuno/pdf-split-autorenamer/releases" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
+      無料ダウンロード
+    </a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section id="top" class="grad-hero text-white">
+  <div class="max-w-6xl mx-auto px-5 py-20 md:py-28 grid md:grid-cols-2 gap-12 items-center">
+    <div>
+      <div class="inline-flex items-center gap-2 text-xs font-semibold tracking-wider uppercase bg-white/10 border border-white/20 rounded-full px-3 py-1 mb-5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        for Office &amp; Back-office Teams
+      </div>
+      <h1 class="font-jp text-4xl md:text-5xl font-extrabold leading-tight">
+        まとめてスキャンしたPDFを、<br/>
+        <span class="bg-gradient-to-r from-accent-400 to-brand-500 bg-clip-text text-transparent">自動で仕分け＆命名。</span>
+      </h1>
+      <p class="mt-6 text-lg text-slate-200 leading-relaxed">
+        複合機やScanSnapで一気にスキャンした書類PDF。<br class="hidden md:block"/>
+        請求書・見積書・議事録・契約書…が混ざった1ファイルを、
+        <strong class="text-white">書類ごとに分割</strong>し、
+        <strong class="text-white">「YYYY-MM-DD_書類タイプ.pdf」</strong>に自動リネームします。
+      </p>
+      <ul class="mt-7 space-y-2 text-slate-100">
+        <li class="bullet">作業 5 分。<span class="text-slate-300">面倒な仕分けと命名がほぼ自動。</span></li>
+        <li class="bullet">命名規則を揃える。<span class="text-slate-300">フォルダ内で表記が統一される。</span></li>
+        <li class="bullet">オフライン完結も可能。<span class="text-slate-300">機密書類でも社外送信なしで動く。</span></li>
+      </ul>
+
+      <!-- ローカルツール明示バッジ -->
+      <div class="mt-7 flex flex-wrap gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-xs font-semibold">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd"/></svg>
+          ローカル動作
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-xs font-semibold">
+          社外送信なし
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-slate-200 text-xs font-semibold">
+          ❌ クラウドサービスではありません
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-slate-200 text-xs font-semibold">
+          ✅ あなたのPCにインストール
+        </span>
+      </div>
+      <div class="mt-9 flex flex-wrap gap-3">
+        <a href="#install" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-ink-900 font-bold hover:bg-slate-100">
+          いますぐ導入する →
+        </a>
+        <a href="#how" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/30 text-white font-semibold hover:bg-white/10">
+          動きを見る
+        </a>
+      </div>
+      <div class="mt-7 flex items-center gap-4 text-xs text-slate-400">
+        <span>Windows / macOS / Linux</span><span>•</span><span>Python 3.10+</span><span>•</span><span>MITライセンス</span>
+      </div>
+    </div>
+
+    <div class="relative">
+      <div class="glass rounded-2xl p-3 shadow-2xl">
+        <img src="images/before-after.svg" alt="Before / After: ばらばらのスキャンPDFが日付付きの命名済みPDFに変わる" class="rounded-xl w-full"/>
+      </div>
+      <div class="absolute -bottom-4 -right-4 hidden md:block bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-lg rotate-2">
+        月◯時間の手作業を削減
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section id="problem" class="py-20 md:py-24 bg-white">
+  <div class="max-w-6xl mx-auto px-5">
+    <div class="text-center mb-14">
+      <p class="text-brand-600 font-bold tracking-wider text-sm uppercase">Problem</p>
+      <h2 class="mt-2 text-3xl md:text-4xl font-extrabold">こんな業務、ありませんか？</h2>
+      <p class="mt-3 text-slate-600">複合機の前で、ドキュメントを1枚ずつ仕分け……</p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+      <article class="rounded-2xl border border-slate-200 p-7 bg-slate-50/60 hover:shadow-lg transition">
+        <div class="text-4xl mb-3">📋</div>
+        <h3 class="font-bold text-lg">総務・庶務</h3>
+        <p class="mt-2 text-slate-700 leading-relaxed">
+          稟議書・通達・社内メモ・出張報告書を毎月まとめてスキャンするけど、
+          ファイル名を1つ1つ付け直すのが地味につらい。
+        </p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 p-7 bg-slate-50/60 hover:shadow-lg transition">
+        <div class="text-4xl mb-3">🧾</div>
+        <h3 class="font-bold text-lg">経理・経費</h3>
+        <p class="mt-2 text-slate-700 leading-relaxed">
+          請求書・領収書・発注書を月末にまとめてスキャン。
+          <strong>電帳法対応</strong>で命名規則をそろえたいけど、人力では揺れが出る。
+        </p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 p-7 bg-slate-50/60 hover:shadow-lg transition">
+        <div class="text-4xl mb-3">📁</div>
+        <h3 class="font-bold text-lg">営業事務 / 士業</h3>
+        <p class="mt-2 text-slate-700 leading-relaxed">
+          顧客ごとの契約書・覚書・議事録をスキャンして共有フォルダへ。
+          <strong>後から検索できる名前</strong>でないと、結局誰も探せない。
+        </p>
+      </article>
+    </div>
+
+    <div class="mt-14 grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+      <div class="rounded-2xl bg-rose-50 border border-rose-200 p-7">
+        <h3 class="font-bold text-lg text-rose-900 mb-3">手作業のとき</h3>
+        <ul class="space-y-2 text-rose-900/90">
+          <li class="cross">PDFを開いて中身を確認</li>
+          <li class="cross">どこで切るか手動で決める</li>
+          <li class="cross">分割ツールでページ範囲指定</li>
+          <li class="cross">1ファイルずつ日付・タイプを命名</li>
+          <li class="cross">表記ゆれが出る（「請求書」「請求」「invoice」）</li>
+        </ul>
+      </div>
+      <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-7">
+        <h3 class="font-bold text-lg text-emerald-900 mb-3">psar を使うと</h3>
+        <ul class="space-y-2 text-emerald-900/90">
+          <li class="check">フォルダを選んで「解析」</li>
+          <li class="check">境界候補が自動で出る → ブラウザで微調整</li>
+          <li class="check">「分割」「リネーム」をワンクリック</li>
+          <li class="check">命名は<strong>プロファイルで統一</strong>（業種別TOML）</li>
+          <li class="check">1ファイル単位の判定ログも残せる</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW: 3 STEPS -->
+<section id="how" class="py-20 md:py-24 bg-ink-50">
+  <div class="max-w-6xl mx-auto px-5">
+    <div class="text-center mb-14">
+      <p class="text-brand-600 font-bold tracking-wider text-sm uppercase">How it works</p>
+      <h2 class="mt-2 text-3xl md:text-4xl font-extrabold">3ステップで仕分け完了</h2>
+      <p class="mt-3 text-slate-600">GUI でも CLI でも、流れは同じ。</p>
+    </div>
+
+    <ol class="space-y-16">
+      <!-- Step 1 — GUI でボタンを押す → ローカルにreport.htmlが生成 → ブラウザで開く -->
+      <li>
+        <div class="flex items-center gap-3 mb-5">
+          <span class="step-num">1</span>
+          <h3 class="text-2xl font-bold">解析（Analyze）</h3>
+        </div>
+        <p class="text-slate-700 leading-relaxed max-w-3xl">
+          フォルダを選んで <span class="inline-block px-1.5 py-0.5 bg-brand-600 text-white rounded text-sm font-semibold">解析を実行</span> ボタンをクリック。
+          <strong>あなたのPC上で</strong>各ページのサムネ・OCR テキスト・向き・サイズを集めて、境界候補を自動推定します。
+          結果はローカルファイル <code class="bg-slate-200 px-1 rounded">.psar/report.html</code> として保存され、ブラウザで自動的に開きます。
+        </p>
+
+        <!-- 2段構成: 上 = GUIアプリ画面（ボタン強調）, 下 = ブラウザに表示される report.html -->
+        <div class="mt-8 grid md:grid-cols-12 gap-4 items-stretch">
+          <!-- 左: GUI アプリ画面 -->
+          <figure class="md:col-span-5 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600 flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+              <strong class="text-slate-800">デスクトップアプリ</strong>
+              <span class="ml-auto text-slate-400">pdf-split-autorenamer (Tkinter GUI)</span>
+            </div>
+            <img src="images/gui-analyze-highlight.svg" alt="GUI画面の「解析を実行」ボタンを強調" class="w-full bg-white"/>
+            <figcaption class="px-4 pb-3 pt-1 text-xs text-slate-600">
+              ① あなたのPCのアプリ画面で <strong>「解析を実行」</strong> をクリック
+            </figcaption>
+          </figure>
+
+          <!-- 中央: 矢印 -->
+          <div class="md:col-span-2 flex md:flex-col items-center justify-center gap-2 text-brand-600">
+            <svg class="hidden md:block w-12 h-12" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            <svg class="md:hidden w-10 h-10 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            <span class="text-xs font-semibold text-slate-600 text-center leading-tight">
+              ローカルで<br/>処理 →<br/>ブラウザに<br/>結果表示
+            </span>
+          </div>
+
+          <!-- 右: ブラウザに表示される report.html -->
+          <figure class="md:col-span-5 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600 flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-sky-500"></span>
+              <strong class="text-slate-800">ブラウザ（ローカルファイル）</strong>
+              <span class="ml-auto text-slate-400 font-mono">file:///.../.psar/report.html</span>
+            </div>
+            <img src="images/report-preview.svg" alt="生成された report.html — 解析結果のレポート画面" class="w-full bg-white"/>
+            <figcaption class="px-4 pb-3 pt-1 text-xs text-slate-600">
+              ② 同じPC内の <code class="bg-slate-200 px-1 rounded">report.html</code> がブラウザで開く（社外送信なし）
+            </figcaption>
+          </figure>
+        </div>
+
+        <ul class="mt-6 grid md:grid-cols-3 gap-2 text-slate-600 text-sm max-w-3xl">
+          <li class="bullet">向きが変わるページで切る</li>
+          <li class="bullet">テキスト類似度の急変点で切る</li>
+          <li class="bullet">タイトルマーカー（「請求書」「議事録」など）で切る</li>
+        </ul>
+      </li>
+
+      <!-- Step 2 -->
+      <li class="grid md:grid-cols-12 gap-6 items-center">
+        <div class="md:col-span-7 order-2 md:order-1">
+          <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+            <pre class="text-sm overflow-x-auto scrollbar-thin"><code class="language-json text-slate-800">{
+  "sample_office_scan.pdf": [
+    { "range": [1, 1],  "name": "2026-04-01_請求書" },
+    { "range": [2, 2],  "name": "2026-04-08_見積書" },
+    { "range": [3, 4],  "name": "2026-04-15_営業部定例議事録" },
+    { "range": [5, 5],  "name": "2026-04-20_稟議書_複合機リプレイス" },
+    { "range": [6, 6],  "name": "2026-04-22_出張報告書_大阪" },
+    { "range": [7, 7],  "name": "2026-04-25_発注書" },
+    { "range": [8, 8],  "name": "2026-04-28_領収書" },
+    { "range": [9, 10], "name": "2026-05-01_業務委託契約書" }
+  ]
+}</code></pre>
+            <p class="text-xs text-slate-500 mt-3">.psar/groups.json — 「ここで切る」「この名前で出す」を 1ファイルで管理</p>
+          </div>
+        </div>
+        <div class="md:col-span-5 order-1 md:order-2">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="step-num">2</span>
+            <h3 class="text-2xl font-bold">確認・調整</h3>
+          </div>
+          <p class="text-slate-700 leading-relaxed">
+            ブラウザで開いた <code class="bg-slate-200 px-1 rounded">report.html</code> 上で、
+            ページ境界を「切る／つなぐ」でクリック調整。出力ファイル名もそこで編集。
+          </p>
+          <ul class="mt-4 space-y-1 text-slate-600 text-sm">
+            <li class="bullet">サムネ＋OCR本文プレビュー付き</li>
+            <li class="bullet">候補名は OCR から自動入力済み</li>
+            <li class="bullet">ボタン1つで <code>groups.json</code> を保存</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Step 3 -->
+      <li class="grid md:grid-cols-12 gap-6 items-center">
+        <div class="md:col-span-5">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="step-num">3</span>
+            <h3 class="text-2xl font-bold">分割＆リネーム</h3>
+          </div>
+          <p class="text-slate-700 leading-relaxed">
+            「分割 実行」→「自動リネーム 実行」のボタン2回で、
+            元PDFが書類ごとに切り出され、
+            <code class="bg-slate-200 px-1 rounded">YYYY-MM-DD_書類タイプ.pdf</code> の形に揃います。
+          </p>
+          <ul class="mt-4 space-y-1 text-slate-600 text-sm">
+            <li class="bullet">日付は半角・全角・元号にも対応</li>
+            <li class="bullet">書類タイプは TOML プロファイルでカスタマイズ</li>
+            <li class="bullet">dry-run でリネーム結果を事前確認</li>
+          </ul>
+        </div>
+        <div class="md:col-span-7">
+          <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+            <img src="images/gui-main.svg" alt="GUI メイン画面" class="w-full"/>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- TOUR -->
+<section id="tour" class="py-20 md:py-24 bg-white">
+  <div class="max-w-6xl mx-auto px-5">
+    <div class="text-center mb-14">
+      <p class="text-brand-600 font-bold tracking-wider text-sm uppercase">Screen tour</p>
+      <h2 class="mt-2 text-3xl md:text-4xl font-extrabold">画面ツアー</h2>
+      <p class="mt-3 text-slate-600">CLI も GUI も両方使えます。事務所では GUI 推奨。</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-8">
+      <figure class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+        <img src="images/gui-main.svg" alt="GUIメイン画面（Tkinter ネイティブ風モック）" class="rounded-xl w-full bg-white"/>
+        <figcaption class="mt-3 text-sm text-slate-600">
+          <strong class="text-slate-800">GUI メイン</strong> — フォルダ選択・3ステップ実行・ログをひとまとめに。Windowsでは <code class="bg-slate-200 px-1 rounded">psar-gui.bat</code> をダブルクリックで起動。
+          <span class="block mt-2 text-xs text-slate-500">※ 実機 Tkinter の見た目を再現したモック。実物は OS のテーマで多少変わります。</span>
+        </figcaption>
+      </figure>
+      <figure class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+        <img src="images/report-preview.svg" alt="解析レポート画面（実物の HTML レイアウト再現）" class="rounded-xl w-full bg-white"/>
+        <figcaption class="mt-3 text-sm text-slate-600">
+          <strong class="text-slate-800">解析レポート（ブラウザ）</strong> — サムネ＋OCR本文プレビュー。<span class="inline-block px-1.5 rounded bg-rose-500 text-white text-xs">cut</span>／<span class="inline-block px-1.5 rounded bg-cyan-100 text-cyan-700 text-xs">join</span> ボタンで境界調整、ファイル名も直接編集。
+          <span class="block mt-2 text-xs text-slate-500">
+            ※ 実物の <code>report.html</code> のレイアウトを再現したモック。
+            <a href="demo/sample_report.html" class="text-brand-700 underline">本物のサンプルを開く →</a>
+          </span>
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="mt-10 rounded-xl bg-slate-50 border border-slate-200 p-5 text-sm text-slate-700">
+      <strong class="text-slate-900">📥 実物で試したい方へ：</strong>
+      <a href="demo/sample_office_scan.pdf" class="text-brand-700 underline ml-1">サンプル PDF（10ページ・8書類混在）</a> をダウンロード →
+      手元の psar で <code class="bg-slate-200 px-1 rounded">psar analyze</code> を実行 →
+      生成された <code>report.html</code> をブラウザで開けば、上のモックとほぼ同じ画面が現れます。
+    </div>
+  </div>
+</section>
+
+<!-- OCR PIPELINE -->
+<section id="ocr" class="py-20 md:py-24 bg-ink-50">
+  <div class="max-w-5xl mx-auto px-5">
+    <div class="text-center mb-12">
+      <p class="text-brand-600 font-bold tracking-wider text-sm uppercase">Under the hood</p>
+      <h2 class="mt-2 text-3xl md:text-4xl font-extrabold">スキャン品質に応じた 3段階 OCR</h2>
+      <p class="mt-3 text-slate-600">
+        まずは速い処理で。読めなかったページだけ、より重い処理に自動でフォールバック。
+      </p>
+    </div>
+
+    <div class="rounded-2xl bg-white border border-slate-200 p-6 md:p-10 shadow-sm">
+      <div class="mermaid">
+flowchart LR
+    A[PDF入力] --> B{テキスト層あり?}
+    B -- Yes --> C[Stage 1<br/>埋め込みテキスト抽出<br/>★最速]
+    B -- No --> D[Stage 2<br/>Tesseract / PaddleOCR<br/>ROI 切り出し]
+    D --> E{結果が空 or<br/>低信頼?}
+    E -- No --> F[完了]
+    E -- Yes --> G[Stage 3<br/>LLM Vision<br/>Claude / GPT-4V]
+    C --> F
+    G --> F
+    F --> H[YYYY-MM-DD_xxx.pdf]
+    classDef stage1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
+    classDef stage2 fill:#fef3c7,stroke:#f59e0b,color:#7c2d12
+    classDef stage3 fill:#fce7f3,stroke:#ec4899,color:#831843
+    class C stage1
+    class D stage2
+    class G stage3
+      </div>
+
+      <div class="mt-8 grid md:grid-cols-3 gap-4 text-sm">
+        <div class="rounded-xl bg-blue-50 border border-blue-200 p-4">
+          <div class="font-bold text-blue-900">Stage 1 — テキスト層</div>
+          <p class="text-blue-900/80 mt-1">PyMuPDF で直接読み出し。ほぼ瞬時、追加コスト 0。</p>
+        </div>
+        <div class="rounded-xl bg-amber-50 border border-amber-200 p-4">
+          <div class="font-bold text-amber-900">Stage 2 — ローカル OCR</div>
+          <p class="text-amber-900/80 mt-1">Tesseract / PaddleOCR / EasyOCR を切替。社内完結。</p>
+        </div>
+        <div class="rounded-xl bg-pink-50 border border-pink-200 p-4">
+          <div class="font-bold text-pink-900">Stage 3 — LLM Vision</div>
+          <p class="text-pink-900/80 mt-1">最後の砦。難読スキャンも文脈で読む。API 課金は最小限。</p>
+        </div>
+      </div>
+
+      <details class="mt-8 group">
+        <summary class="flex items-center gap-2 text-slate-700 hover:text-brand-700">
+          <svg class="w-4 h-4 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="font-semibold">プロファイル（業種別ルール）について</span>
+        </summary>
+        <div class="mt-4 prose prose-slate max-w-none">
+          <p>
+            「請求書」「見積書」「議事録」など、社内でよく使う書類タイプは
+            <code>profiles/business.toml</code> のような TOML ファイルにまとめ、現場ごとに調整できます。
+            既定で <code>church.toml</code> / <code>business.toml</code> を同梱。
+          </p>
+          <pre class="bg-slate-900 text-slate-100 p-4 rounded-lg text-xs overflow-x-auto"><code>[[document_types]]
+name = "請求書"
+keywords = ["請求書", "御請求書", "INVOICE"]
+output_template = "{date}_請求書"
+
+[[document_types]]
+name = "議事録"
+keywords = ["議事録", "会議記録", "ミーティング"]
+output_template = "{date}_{group}議事録"</code></pre>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section id="install" class="py-20 md:py-24 bg-white">
+  <div class="max-w-5xl mx-auto px-5">
+    <div class="text-center mb-12">
+      <p class="text-brand-600 font-bold tracking-wider text-sm uppercase">Get started</p>
+      <h2 class="mt-2 text-3xl md:text-4xl font-extrabold">導入する</h2>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 text-white p-7 shadow-lg">
+        <div class="text-xs font-semibold tracking-widest uppercase opacity-80">A. 実行ファイル（推奨：非エンジニア向け）</div>
+        <h3 class="mt-2 text-2xl font-bold">ダウンロードして起動するだけ</h3>
+        <p class="mt-3 text-white/90 leading-relaxed">
+          GitHub Releases からプラットフォームに合った実行ファイルを取得。
+          Windows なら同梱の <code class="bg-white/20 px-1 rounded">psar-gui.bat</code> をダブルクリック。
+        </p>
+        <ul class="mt-5 space-y-1.5 text-sm text-white/90">
+          <li class="bullet">Windows: <code>psar-windows.exe</code></li>
+          <li class="bullet">macOS: <code>psar-macos</code></li>
+          <li class="bullet">Linux: <code>psar-linux</code></li>
+        </ul>
+        <a href="https://github.com/ShigetoshiMizuno/pdf-split-autorenamer/releases" class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white text-brand-700 font-bold hover:bg-slate-100">
+          Releases を開く →
+        </a>
+      </div>
+
+      <div class="rounded-2xl bg-ink-900 text-slate-100 p-7 shadow-lg">
+        <div class="text-xs font-semibold tracking-widest uppercase text-accent-400">B. Python パッケージ（開発者向け）</div>
+        <h3 class="mt-2 text-2xl font-bold">pip でインストール</h3>
+        <pre class="mt-4 bg-black/40 rounded-lg p-4 text-sm overflow-x-auto"><code># 1. クローンして editable install
+git clone https://github.com/ShigetoshiMizuno/pdf-split-autorenamer.git
+cd pdf-split-autorenamer
+pip install -e .
+
+# 2. GUI を起動
+psar gui
+
+# 3. CLI でも使える
+psar analyze ./scanned_pdfs
+psar split    ./scanned_pdfs
+psar rename   ./scanned_pdfs</code></pre>
+        <p class="mt-4 text-xs text-slate-400">
+          推奨: <code>pdftotext</code>（Poppler）/ Tesseract をインストールしておくと OCR 精度が上がります。
+        </p>
+      </div>
+    </div>
+
+    <div class="mt-10 rounded-2xl bg-amber-50 border border-amber-200 p-6 text-amber-900">
+      <strong>⚙ 動作要件:</strong> Python 3.10 以上 / Windows 10+ / macOS 12+ / 主要 Linux ディストリ。
+      実行ファイル版は別途インストール不要（Python は不要）。Poppler / Tesseract は精度向上のため別途推奨。
+    </div>
+    <div class="mt-4 rounded-2xl bg-emerald-50 border border-emerald-200 p-6 text-emerald-900">
+      <strong>🔒 動作モデル:</strong>
+      これは <strong>あなたのPCにインストールして動くデスクトップツール</strong>です。
+      クラウドサーバーや SaaS ではなく、サインアップ・月額課金もありません。
+      PDF データはあなたのPCの中だけで処理されます（Stage 3 LLM Vision を有効化した場合のみ、明示的に外部APIへ送信）。
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="py-20 md:py-24 bg-ink-50">
+  <div class="max-w-3xl mx-auto px-5">
+    <div class="text-center mb-12">
+      <p class="text-brand-600 font-bold tracking-wider text-sm uppercase">FAQ</p>
+      <h2 class="mt-2 text-3xl md:text-4xl font-extrabold">よくある質問</h2>
+    </div>
+
+    <div class="space-y-3">
+      <details class="rounded-xl bg-white border border-slate-200 p-5 group" open>
+        <summary class="flex justify-between items-center font-semibold">
+          <span>これは Web サービス（SaaS）ですか？</span>
+          <span class="transition group-open:rotate-180 text-slate-400">▾</span>
+        </summary>
+        <p class="mt-3 text-slate-700 leading-relaxed">
+          <strong>いいえ。あなたのPCにインストールして動くデスクトップツール</strong>です。
+          サインアップやログインはなく、月額課金もありません。
+          ブラウザ画面（解析レポート）も <code class="bg-slate-200 px-1 rounded">file:///</code> で開く<strong>ローカルのHTMLファイル</strong>で、
+          どこかのサーバーに繋がっているわけではありません。
+          MIT ライセンスのオープンソースで、ソースコードはすべて公開されています。
+        </p>
+      </details>
+
+      <details class="rounded-xl bg-white border border-slate-200 p-5 group">
+        <summary class="flex justify-between items-center font-semibold">
+          <span>機密書類でも使えますか？社外送信されませんか？</span>
+          <span class="transition group-open:rotate-180 text-slate-400">▾</span>
+        </summary>
+        <p class="mt-3 text-slate-700 leading-relaxed">
+          Stage 1（テキスト層抽出）と Stage 2（Tesseract / PaddleOCR / EasyOCR）はすべてローカル完結です。
+          社外送信なしで運用できます。
+          Stage 3（LLM Vision）は <strong>明示的に有効化したときだけ</strong> Claude / OpenAI へ送信します。
+          完全オフライン運用したい場合は <code>--ocr-strategy fast/balanced/roi/thorough</code> を選択してください。
+        </p>
+      </details>
+
+      <details class="rounded-xl bg-white border border-slate-200 p-5 group">
+        <summary class="flex justify-between items-center font-semibold">
+          <span>電子帳簿保存法（電帳法）対応として使えますか？</span>
+          <span class="transition group-open:rotate-180 text-slate-400">▾</span>
+        </summary>
+        <p class="mt-3 text-slate-700 leading-relaxed">
+          ファイル名の<strong>命名規則を統一</strong>できるため、
+          「日付・取引先・金額」を含む命名による検索性確保（電帳法スキャナ保存の検索要件）の補助になります。
+          ただし真正性確保（タイムスタンプ・改ざん防止）は別途専用システムをご利用ください。
+        </p>
+      </details>
+
+      <details class="rounded-xl bg-white border border-slate-200 p-5 group">
+        <summary class="flex justify-between items-center font-semibold">
+          <span>テンプレートにない書類タイプも追加できますか？</span>
+          <span class="transition group-open:rotate-180 text-slate-400">▾</span>
+        </summary>
+        <p class="mt-3 text-slate-700 leading-relaxed">
+          <code>profiles/*.toml</code> に <code>[[document_types]]</code> エントリを追加するだけ。
+          キーワードと出力テンプレートを書けば即反映されます。
+          業種ごとの TOML を共有フォルダに置けば、部署内で命名規則を統一できます。
+        </p>
+      </details>
+
+      <details class="rounded-xl bg-white border border-slate-200 p-5 group">
+        <summary class="flex justify-between items-center font-semibold">
+          <span>OCR がうまくいかなかったページはどうなりますか？</span>
+          <span class="transition group-open:rotate-180 text-slate-400">▾</span>
+        </summary>
+        <p class="mt-3 text-slate-700 leading-relaxed">
+          日付やタイプを推定できなかった場合、ファイル名が <code>日付不明_xxx.pdf</code> のようになります。
+          後から GUI で「日付不明_を再考」モードを選んで再実行できます。
+          手動で正しい名前に変更するのも当然 OK です。
+        </p>
+      </details>
+
+      <details class="rounded-xl bg-white border border-slate-200 p-5 group">
+        <summary class="flex justify-between items-center font-semibold">
+          <span>料金はかかりますか？</span>
+          <span class="transition group-open:rotate-180 text-slate-400">▾</span>
+        </summary>
+        <p class="mt-3 text-slate-700 leading-relaxed">
+          本ツールは <strong>MIT ライセンスのオープンソース</strong>で、利用料金はかかりません。
+          Stage 3 で外部 LLM API を使う場合のみ、API 利用料が別途発生します（Anthropic / OpenAI）。
+        </p>
+      </details>
+
+      <details class="rounded-xl bg-white border border-slate-200 p-5 group">
+        <summary class="flex justify-between items-center font-semibold">
+          <span>サポートや導入相談はできますか？</span>
+          <span class="transition group-open:rotate-180 text-slate-400">▾</span>
+        </summary>
+        <p class="mt-3 text-slate-700 leading-relaxed">
+          GitHub Issues でお問い合わせください。導入・カスタマイズのご相談は
+          <a href="mailto:info@nongsoft.com" class="text-brand-700 underline">info@nongsoft.com</a> まで。
+        </p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-20 md:py-24 grad-hero text-white">
+  <div class="max-w-4xl mx-auto px-5 text-center">
+    <h2 class="text-3xl md:text-4xl font-extrabold">複合機まとめスキャン、もう仕分け作業に時間を使わない。</h2>
+    <p class="mt-5 text-lg text-slate-200">
+      まずは無料の実行ファイルを試して、現場の書類で動かしてみてください。
+    </p>
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+      <a href="https://github.com/ShigetoshiMizuno/pdf-split-autorenamer/releases" class="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white text-ink-900 font-bold hover:bg-slate-100">
+        無料ダウンロード →
+      </a>
+      <a href="https://github.com/ShigetoshiMizuno/pdf-split-autorenamer" class="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-white/30 text-white font-semibold hover:bg-white/10">
+        GitHub を見る
+      </a>
+    </div>
+    <p class="mt-6 text-xs text-slate-400">サンプル PDF・サンプル groups.json は <a class="underline" href="demo/sample_office_scan.pdf">こちら</a> からダウンロードして手元で試せます。</p>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="bg-ink-900 text-slate-400 py-10">
+  <div class="max-w-6xl mx-auto px-5 flex flex-col md:flex-row items-center gap-4 justify-between text-sm">
+    <div class="flex items-center gap-3">
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-600 to-accent-500 text-white font-extrabold">P</span>
+      <span class="font-semibold text-slate-200">pdf-split-autorenamer</span>
+      <span class="opacity-60">© Nongsoft / Shigetoshi Mizuno</span>
+    </div>
+    <div class="flex gap-5">
+      <a href="https://github.com/ShigetoshiMizuno/pdf-split-autorenamer" class="hover:text-white">GitHub</a>
+      <a href="https://github.com/ShigetoshiMizuno/pdf-split-autorenamer/releases" class="hover:text-white">Releases</a>
+      <a href="https://github.com/ShigetoshiMizuno/pdf-split-autorenamer/issues" class="hover:text-white">Issues</a>
+      <a href="https://opensource.org/licenses/MIT" class="hover:text-white">MIT License</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

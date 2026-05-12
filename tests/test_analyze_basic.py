@@ -263,6 +263,14 @@ class TestRunAnalyze:
         result = run_analyze(tmp_path, work_dir=work_dir)
         assert result["pages"] == 1  # only scan.pdf processed
 
+    def test_single_pdf_path_filters_to_that_file(self, tmp_path):
+        """issue #35: src_dir に PDF ファイルパスを渡すと、その PDF だけ処理される"""
+        _make_pdf(tmp_path / "scan_a.pdf", pages=2)
+        _make_pdf(tmp_path / "scan_b.pdf", pages=3)
+        work_dir = tmp_path / ".psar"
+        result = run_analyze(tmp_path / "scan_a.pdf", work_dir=work_dir)
+        assert result["pages"] == 2  # scan_b の 3 ページは含まれない
+
 
 class TestCollectPages:
     def test_empty_folder_returns_empty(self, tmp_path):

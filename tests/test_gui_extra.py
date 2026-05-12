@@ -2,19 +2,19 @@
 """gui.py の追加カバレッジテスト（Tkinter を最大限モック）
 
 対象:
-- _TextHandler._append (lines 37-38)
-- App._build_ui (lines 56-128)
-- App._on_browse (lines 133-136)
-- App._get_folder (lines 147-155)
-- App._log / _set_status (lines 158-164)
-- App._run_async (lines 167-176)
-- App._build_split_summary / _build_rename_summary (static, lines 181-214)
-- App._on_analyze early return (lines 221-242)
-- App._on_open_report (lines 245-252)
-- App._on_split early return (lines 255-257)
-- App._on_rename early return (line 313) + done closures (329-330, 349-363)
-- main (lines 369-371)
-- __main__ guard (line 375)
+- _TextHandler._append
+- App._build_ui
+- App._on_browse / _get_folder
+- App._log / _set_status / _run_async
+- App._build_split_summary (static)
+- App._on_analyze early return
+- App._on_open_report
+- App._on_split early return
+- main / __main__ guard
+
+issue #40: Step 3 「自動リネーム」を Step 2 分割に統合したため、
+_on_rename / _build_rename_summary / _on_browse_profile / profile_var /
+rename_mode_var 関連のテストは削除。
 """
 from __future__ import annotations
 
@@ -53,9 +53,7 @@ def _make_app(folder: str = "") -> object:
         app = gui_module.App()
     app.__dict__.update({
         "folder_var": _StringVar(folder),
-        "rename_mode_var": _StringVar("split"),
         "force_var": _BooleanVar(False),
-        "profile_var": _StringVar(""),
         "status_var": _StringVar("待機中"),
         "log": MagicMock(),
     })
@@ -90,6 +88,27 @@ class TestBuildUi:
              patch.object(gui_module, "tk", MagicMock()), \
              patch("logging.getLogger", return_value=MagicMock()):
             app._build_ui()
+
+
+# ---------------------------------------------------------------------------
+# App.__init__  (Tk 実体生成までモックして、属性初期化と _build_ui 呼び出しをカバー)
+# ---------------------------------------------------------------------------
+
+class TestAppInit:
+    def test_init_creates_state_vars(self):
+        """App.__init__ が title/geometry/minsize/folder_var/force_var を初期化し _build_ui を呼ぶ"""
+        from pdf_split_autorenamer import gui as gui_module
+        with patch.object(gui_module.tk.Tk, "__init__", return_value=None), \
+             patch.object(gui_module.App, "title"), \
+             patch.object(gui_module.App, "geometry"), \
+             patch.object(gui_module.App, "minsize"), \
+             patch.object(gui_module.App, "_build_ui") as mb_ui, \
+             patch.object(gui_module, "tk", MagicMock(StringVar=MagicMock, BooleanVar=MagicMock)):
+            app = gui_module.App(initial_folder="/tmp")
+        mb_ui.assert_called_once()
+        # folder_var / force_var が設定されている
+        assert hasattr(app, "folder_var")
+        assert hasattr(app, "force_var")
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +162,49 @@ class TestGetFolder:
         app = _make_app(str(tmp_path))
         result = app._get_folder()
         assert result == tmp_path
+
+    def test_valid_pdf_file_returns_path(self, tmp_path):
+        """issue #35: 単一 PDF ファイルパスでも受理する"""
+        pdf = tmp_path / "x.pdf"
+        pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app(str(pdf))
+        result = app._get_folder()
+        assert result == pdf
+
+
+class TestOnBrowseFile:
+    def test_browse_file_sets_path(self, tmp_path):
+        """issue #35: ファイル選択で folder_var に PDF パスがセットされる"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        with patch.object(gui_module.filedialog, "askopenfilename",
+                          return_value="/tmp/a.pdf"):
+            app._on_browse_file()
+        assert app.folder_var.get() == "/tmp/a.pdf"
+
+    def test_browse_file_cancel_keeps_existing(self):
+        """ファイル選択キャンセルなら folder_var は変更されない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("/orig")
+        with patch.object(gui_module.filedialog, "askopenfilename", return_value=""):
+            app._on_browse_file()
+        assert app.folder_var.get() == "/orig"
+
+    def test_browse_file_initial_from_file(self, tmp_path):
+        """既に PDF ファイルが入っているとき、initialdir はその親フォルダ"""
+        from pdf_split_autorenamer import gui as gui_module
+        pdf = tmp_path / "x.pdf"
+        pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app(str(pdf))
+        captured = {}
+
+        def fake_open(**kwargs):
+            captured.update(kwargs)
+            return ""
+
+        with patch.object(gui_module.filedialog, "askopenfilename", side_effect=fake_open):
+            app._on_browse_file()
+        assert captured.get("initialdir") == str(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -244,40 +306,12 @@ class TestBuildSplitSummary:
         assert "実行してよろしいですか" in s
 
 
-class TestBuildRenameSummary:
-    def test_basic_output(self):
-        from pdf_split_autorenamer.gui import App
-        res = {
-            "targets": 2,
-            "actions": [{"status": "dry-run", "src": "old.pdf", "src_display": "old.pdf",
-                          "dst": "2026-04-06_議事録.pdf", "date": "2026-04-06", "kind": "議事録"}],
-        }
-        s = App._build_rename_summary(res, "split")
-        assert "2 件" in s
-        assert "old.pdf" in s
-
-    def test_skip_status(self):
-        from pdf_split_autorenamer.gui import App
-        res = {
-            "targets": 1,
-            "actions": [{"status": "skip", "src": "old.pdf", "src_display": "old.pdf",
-                          "dst": "new.pdf", "date": "2026-04-06", "kind": "議事録"}],
-        }
-        s = App._build_rename_summary(res, "split")
-        assert "skip" in s
-        assert "既存ファイルあり" in s
-
-    def test_truncates_long_list(self):
-        from pdf_split_autorenamer.gui import App
-        actions = [{"status": "dry-run", "src": f"f{i}.pdf", "src_display": f"f{i}.pdf",
-                    "dst": f"d{i}.pdf", "date": None, "kind": "書類"} for i in range(15)]
-        res = {"targets": 15, "actions": actions}
-        s = App._build_rename_summary(res, "split")
-        assert "他 5 件" in s
+# issue #40: TestBuildRenameSummary は Step 3 自動リネーム削除に伴い廃止。
+# rename ロジック自体は CLI 用に残存し、tests/test_rename.py でカバーされる。
 
 
 # ---------------------------------------------------------------------------
-# _on_analyze early return  (line 222-223)
+# _on_analyze early return
 # ---------------------------------------------------------------------------
 
 class TestOnAnalyze:
@@ -297,12 +331,13 @@ class TestOnAnalyze:
              patch.object(app, "_log"), \
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "showwarning"), \
              patch.object(app, "_run_async",
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
 
     def test_analyze_done_opens_browser_when_pywebview_unavailable(self, tmp_path):
-        """pywebview 未導入時: report_html が返ると done コールバックがブラウザを開く"""
+        """pywebview 未導入時: 正常解析でダイアログなしに webbrowser.open が呼ばれる (#37 + #30)"""
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
@@ -312,15 +347,18 @@ class TestOnAnalyze:
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
              patch.object(gui_module._inapp, "is_available", return_value=False), \
-             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
+             patch.object(gui_module.messagebox, "askyesno") as masky, \
+             patch.object(gui_module.messagebox, "showwarning") as msw, \
              patch.object(gui_module, "webbrowser") as mwb, \
              patch.object(app, "_run_async",
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
+        masky.assert_not_called()
+        msw.assert_not_called()
         mwb.open.assert_called_once()
 
     def test_analyze_done_invokes_inapp_edit_when_pywebview_available(self, tmp_path):
-        """pywebview 導入時: report_html が返ると done コールバックが _on_inapp_edit を呼ぶ"""
+        """pywebview 導入時: 正常解析でダイアログなしに _on_inapp_edit が呼ばれる (#37 + #30)"""
         from pdf_split_autorenamer import gui as gui_module
         app = _make_app(str(tmp_path))
         fake_html = str(tmp_path / "report.html")
@@ -330,12 +368,66 @@ class TestOnAnalyze:
              patch.object(app, "_set_status"), \
              patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
              patch.object(gui_module._inapp, "is_available", return_value=True), \
-             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
+             patch.object(gui_module.messagebox, "askyesno") as masky, \
              patch.object(app, "_on_inapp_edit") as m_edit, \
              patch.object(app, "_run_async",
                           side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
             app._on_analyze()
+        masky.assert_not_called()
         m_edit.assert_called_once()
+
+    def test_analyze_done_pages_zero_shows_warning(self, tmp_path):
+        """issue #37: pages == 0 → 警告ダイアログ、ブラウザも編集も開かない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        fake_html = str(tmp_path / "report.html")
+        mock_result = {"pages": 0, "groups": 0, "report_html": fake_html, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "showwarning") as msw, \
+             patch.object(gui_module, "webbrowser") as mwb, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        msw.assert_called_once()
+        mwb.open.assert_not_called()
+
+    def test_analyze_done_groups_zero_shows_warning(self, tmp_path):
+        """issue #37: groups == 0 (pages > 0) → 警告ダイアログ、ブラウザは開かない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        fake_html = str(tmp_path / "report.html")
+        mock_result = {"pages": 5, "groups": 0, "report_html": fake_html, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "showwarning") as msw, \
+             patch.object(gui_module, "webbrowser") as mwb, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        msw.assert_called_once()
+        mwb.open.assert_not_called()
+
+    def test_analyze_done_html_missing_shows_warning(self, tmp_path):
+        """issue #37: report_html が None → 警告ダイアログ、ブラウザは開かない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        mock_result = {"pages": 3, "groups": 2, "report_html": None, "groups_json": ""}
+        with patch.object(app, "_get_folder", return_value=tmp_path), \
+             patch.object(app, "_log"), \
+             patch.object(app, "_set_status"), \
+             patch.object(gui_module._analyze, "run_analyze", return_value=mock_result), \
+             patch.object(gui_module.messagebox, "showwarning") as msw, \
+             patch.object(gui_module, "webbrowser") as mwb, \
+             patch.object(app, "_run_async",
+                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
+            app._on_analyze()
+        msw.assert_called_once()
+        mwb.open.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -450,110 +542,40 @@ class TestOnSplit:
         assert "キャンセル" in statuses
 
 
-# ---------------------------------------------------------------------------
-# _on_rename early return (line 313) + done closures (lines 329-330, 349-363)
-# ---------------------------------------------------------------------------
-
-class TestOnRenameExtra:
-    def test_early_return_when_no_folder(self):
-        """folder が None なら即 return (line 313)"""
-        from pdf_split_autorenamer import gui as gui_module
-        app = _make_app()
-        with patch.object(app, "_get_folder", return_value=None), \
-             patch.object(app, "_run_async") as mra:
-            app._on_rename(apply_=False)
-        mra.assert_not_called()
-
-    def test_done_dry_logs_actions(self, tmp_path):
-        """done_dry コールバックがアクションをログに出力する (lines 327-331)"""
-        from pdf_split_autorenamer import gui as gui_module
-        app = _make_app(str(tmp_path))
-        logged = []
-        mock_result = {
-            "targets": 1,
-            "actions": [{"status": "dry-run", "src": "scan_01.pdf",
-                          "src_display": "scan_01.pdf",
-                          "dst": "2026-04-06_書類.pdf", "date": "2026-04-06", "kind": "書類"}],
-            "applied": 0,
-        }
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
-             patch.object(gui_module._rename, "run_rename", return_value=mock_result), \
-             patch.object(app, "_log", side_effect=logged.append), \
-             patch.object(app, "_set_status"), \
-             patch.object(app, "_run_async",
-                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
-            app._on_rename(apply_=False)
-        assert any("scan_01.pdf" in m for m in logged)
-
-    def test_done_apply_logs_results(self, tmp_path):
-        """done_apply コールバックが完了件数をログに出力する (lines 349-363)"""
-        from pdf_split_autorenamer import gui as gui_module
-        app = _make_app(str(tmp_path))
-        logged = []
-        mock_result = {
-            "targets": 1,
-            "actions": [{"status": "ok", "src": "scan_01.pdf", "src_display": "scan_01.pdf",
-                          "dst": "2026-04-06_書類.pdf", "date": "2026-04-06", "kind": "書類"}],
-            "applied": 1,
-        }
-        with patch.object(app, "_get_folder", return_value=tmp_path), \
-             patch.object(gui_module._rename, "run_rename", return_value=mock_result), \
-             patch.object(gui_module.messagebox, "askyesno", return_value=True), \
-             patch.object(app, "_log", side_effect=logged.append), \
-             patch.object(app, "_set_status"), \
-             patch.object(app, "_run_async",
-                          side_effect=lambda fn, cb=None: cb(fn()) if cb else fn()):
-            app._on_rename(apply_=True)
-        assert any("1 件" in m for m in logged)
+# issue #40: _on_rename テスト群は廃止。GUI 自動リネームは Step 2 分割に統合された。
+# rename ロジック自体は CLI 用に残存し、tests/test_rename.py でカバーされる。
 
 
 # ---------------------------------------------------------------------------
-# _toggle_split_advanced / _toggle_rename_advanced  (lines 234-245)
+# _toggle_split_advanced  (Step 2 詳細オプション折りたたみ)
 # ---------------------------------------------------------------------------
 
 class TestToggleAdvanced:
-    def _make_app_with_advanced(self, split_checked: bool, rename_checked: bool) -> object:
+    def _make_app_with_advanced(self, split_checked: bool) -> object:
         app = _make_app()
         app.__dict__["_split_advanced_var"] = _BooleanVar(split_checked)
-        app.__dict__["_rename_advanced_var"] = _BooleanVar(rename_checked)
         split_frame = MagicMock()
         split_frame.master.winfo_children.return_value = [MagicMock(), MagicMock()]
-        rename_frame = MagicMock()
         app.__dict__["_split_advanced_frame"] = split_frame
-        app.__dict__["_rename_advanced_frame"] = rename_frame
         return app
 
     def test_toggle_split_advanced_pack_when_checked(self):
         """split_advanced_var=True → pack が呼ばれる"""
-        app = self._make_app_with_advanced(split_checked=True, rename_checked=False)
+        app = self._make_app_with_advanced(split_checked=True)
         app._toggle_split_advanced()
         app._split_advanced_frame.pack.assert_called_once()
         app._split_advanced_frame.pack_forget.assert_not_called()
 
     def test_toggle_split_advanced_pack_forget_when_unchecked(self):
         """split_advanced_var=False → pack_forget が呼ばれる"""
-        app = self._make_app_with_advanced(split_checked=False, rename_checked=False)
+        app = self._make_app_with_advanced(split_checked=False)
         app._toggle_split_advanced()
         app._split_advanced_frame.pack_forget.assert_called_once()
         app._split_advanced_frame.pack.assert_not_called()
 
-    def test_toggle_rename_advanced_pack_when_checked(self):
-        """rename_advanced_var=True → pack が呼ばれる"""
-        app = self._make_app_with_advanced(split_checked=False, rename_checked=True)
-        app._toggle_rename_advanced()
-        app._rename_advanced_frame.pack.assert_called_once()
-        app._rename_advanced_frame.pack_forget.assert_not_called()
-
-    def test_toggle_rename_advanced_pack_forget_when_unchecked(self):
-        """rename_advanced_var=False → pack_forget が呼ばれる"""
-        app = self._make_app_with_advanced(split_checked=False, rename_checked=False)
-        app._toggle_rename_advanced()
-        app._rename_advanced_frame.pack_forget.assert_called_once()
-        app._rename_advanced_frame.pack.assert_not_called()
-
 
 # ---------------------------------------------------------------------------
-# main (lines 369-371) + __main__ guard (line 375)
+# main + __main__ guard
 # ---------------------------------------------------------------------------
 
 class TestMain:

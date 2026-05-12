@@ -1,0 +1,225 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1754" font-family="'Noto Sans JP','Inter',sans-serif">
+  <!-- A4 縦 = 210×297mm = 1240×1754px @ 150dpi -->
+  <defs>
+    <linearGradient id="bgTop" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="0.85" cy="0.05" r="0.6">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.05" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2563eb" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#2563eb" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- ===== ヘッダー帯 (上 350px) — ダーク ===== -->
+  <rect x="0" y="0" width="1240" height="450" fill="url(#bgTop)"/>
+  <rect x="0" y="0" width="1240" height="450" fill="url(#glow1)"/>
+  <rect x="0" y="0" width="1240" height="450" fill="url(#glow2)"/>
+
+  <!-- ロゴ + プロダクト名 -->
+  <g transform="translate(80, 80)">
+    <rect width="60" height="60" rx="12" fill="url(#accent)"/>
+    <text x="30" y="42" text-anchor="middle" font-size="34" font-weight="800" fill="#0f172a">P</text>
+    <text x="78" y="32" font-size="26" font-weight="700" fill="#f8fafc">pdf-split-autorenamer</text>
+    <text x="78" y="56" font-size="14" fill="#94a3b8">for Office &amp; Back-office Teams</text>
+  </g>
+
+  <!-- バッジ -->
+  <g transform="translate(80, 180)">
+    <g>
+      <rect width="120" height="30" rx="15" fill="#10b98122" stroke="#10b98155"/>
+      <text x="60" y="20" text-anchor="middle" font-size="13" font-weight="600" fill="#6ee7b7">ローカル動作</text>
+    </g>
+    <g transform="translate(130, 0)">
+      <rect width="130" height="30" rx="15" fill="#10b98122" stroke="#10b98155"/>
+      <text x="65" y="20" text-anchor="middle" font-size="13" font-weight="600" fill="#6ee7b7">社外送信なし</text>
+    </g>
+    <g transform="translate(270, 0)">
+      <rect width="100" height="30" rx="15" fill="#ffffff15" stroke="#ffffff30"/>
+      <text x="50" y="20" text-anchor="middle" font-size="13" font-weight="600" fill="#cbd5e1">MIT OSS</text>
+    </g>
+    <g transform="translate(380, 0)">
+      <rect width="120" height="30" rx="15" fill="#ffffff15" stroke="#ffffff30"/>
+      <text x="60" y="20" text-anchor="middle" font-size="13" font-weight="600" fill="#cbd5e1">Win / Mac / Linux</text>
+    </g>
+  </g>
+
+  <!-- メインキャッチ（2行）-->
+  <text x="80" y="290" font-size="50" font-weight="800" fill="#f8fafc">まとめてスキャンしたPDFを、</text>
+  <text x="80" y="350" font-size="50" font-weight="800" fill="url(#accent)">自動で仕分け＆命名。</text>
+
+  <text x="80" y="400" font-size="20" fill="#cbd5e1">複合機・ScanSnapで一気に取り込んだ書類を、</text>
+  <text x="80" y="428" font-size="20" fill="#cbd5e1">『YYYY-MM-DD_書類タイプ.pdf』に整理。</text>
+
+  <!-- ===== ヒーロービジュアル (450 〜 800) — 白帯 ===== -->
+  <rect x="0" y="450" width="1240" height="380" fill="#ffffff"/>
+
+  <!-- 左: 紙の山（Before） -->
+  <g transform="translate(140, 530)" filter="url(#shadow)">
+    <g opacity="0.9">
+      <rect x="-8" y="-4" width="180" height="240" rx="6" fill="#fff" stroke="#cbd5e1" transform="rotate(-7 80 116)"/>
+      <rect x="4" y="2" width="180" height="240" rx="6" fill="#fff" stroke="#cbd5e1" transform="rotate(-3 80 116)"/>
+      <rect x="0" y="0" width="180" height="240" rx="6" fill="#fff" stroke="#cbd5e1"/>
+      <line x1="20" y1="40" x2="160" y2="40" stroke="#94a3b8" stroke-width="3"/>
+      <line x1="20" y1="70" x2="160" y2="70" stroke="#cbd5e1" stroke-width="2"/>
+      <line x1="20" y1="100" x2="140" y2="100" stroke="#cbd5e1" stroke-width="2"/>
+      <line x1="20" y1="130" x2="155" y2="130" stroke="#cbd5e1" stroke-width="2"/>
+      <line x1="20" y1="160" x2="120" y2="160" stroke="#cbd5e1" stroke-width="2"/>
+      <line x1="20" y1="190" x2="150" y2="190" stroke="#cbd5e1" stroke-width="2"/>
+    </g>
+    <text x="90" y="280" text-anchor="middle" font-size="17" font-weight="700" fill="#b42318">Before: 1ファイル混在</text>
+  </g>
+
+  <!-- 中央: 矢印 + ラベル -->
+  <g transform="translate(540, 660)">
+    <path d="M0 -20 L80 -20 L80 -40 L140 0 L80 40 L80 20 L0 20 Z" fill="url(#accent)"/>
+    <text x="70" y="80" text-anchor="middle" font-size="16" font-weight="700" fill="#0f172a">3 Step</text>
+    <text x="70" y="100" text-anchor="middle" font-size="13" fill="#475569">解析 → 確認 → 実行</text>
+  </g>
+
+  <!-- 右: 整理されたファイル群（After） -->
+  <g transform="translate(800, 510)">
+    <g>
+      <rect width="280" height="38" rx="6" fill="#fff" stroke="#10b981" stroke-width="2.5"/>
+      <rect x="8" y="8" width="22" height="22" fill="#10b98133"/>
+      <text x="40" y="26" font-size="14" font-weight="600" fill="#0f172a">2026-04-01_請求書.pdf</text>
+    </g>
+    <g transform="translate(0, 50)">
+      <rect width="280" height="38" rx="6" fill="#fff" stroke="#10b981" stroke-width="2.5"/>
+      <rect x="8" y="8" width="22" height="22" fill="#10b98133"/>
+      <text x="40" y="26" font-size="14" font-weight="600" fill="#0f172a">2026-04-08_見積書.pdf</text>
+    </g>
+    <g transform="translate(0, 100)">
+      <rect width="280" height="38" rx="6" fill="#fff" stroke="#10b981" stroke-width="2.5"/>
+      <rect x="8" y="8" width="22" height="22" fill="#10b98133"/>
+      <text x="40" y="26" font-size="14" font-weight="600" fill="#0f172a">2026-04-15_議事録.pdf</text>
+    </g>
+    <g transform="translate(0, 150)">
+      <rect width="280" height="38" rx="6" fill="#fff" stroke="#10b981" stroke-width="2.5"/>
+      <rect x="8" y="8" width="22" height="22" fill="#10b98133"/>
+      <text x="40" y="26" font-size="14" font-weight="600" fill="#0f172a">2026-04-25_発注書.pdf</text>
+    </g>
+    <g transform="translate(0, 200)">
+      <rect width="280" height="38" rx="6" fill="#fff" stroke="#10b981" stroke-width="2.5"/>
+      <rect x="8" y="8" width="22" height="22" fill="#10b98133"/>
+      <text x="40" y="26" font-size="14" font-weight="600" fill="#0f172a">2026-05-01_契約書.pdf</text>
+    </g>
+    <text x="140" y="280" text-anchor="middle" font-size="17" font-weight="700" fill="#067647">After: 命名統一・日付順</text>
+  </g>
+
+  <!-- ===== 3 ステップ説明 (830 〜 1180) — 薄グレー帯 ===== -->
+  <rect x="0" y="830" width="1240" height="370" fill="#f8fafc"/>
+  <text x="620" y="890" text-anchor="middle" font-size="32" font-weight="800" fill="#0f172a">たった 3 ステップで仕分け完了</text>
+
+  <!-- Step 1 -->
+  <g transform="translate(120, 940)">
+    <circle cx="50" cy="50" r="46" fill="url(#accent)"/>
+    <text x="50" y="64" text-anchor="middle" font-size="42" font-weight="800" fill="#fff">1</text>
+    <text x="50" y="125" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">解析</text>
+    <text x="50" y="155" text-anchor="middle" font-size="13" fill="#475569">フォルダを選んで</text>
+    <text x="50" y="173" text-anchor="middle" font-size="13" fill="#475569">「解析」ボタン</text>
+    <text x="50" y="200" text-anchor="middle" font-size="11" fill="#94a3b8">境界候補を自動推定</text>
+  </g>
+
+  <!-- 矢印 → -->
+  <text x="290" y="1010" font-size="40" fill="#cbd5e1">→</text>
+
+  <!-- Step 2 -->
+  <g transform="translate(440, 940)">
+    <circle cx="50" cy="50" r="46" fill="url(#accent)"/>
+    <text x="50" y="64" text-anchor="middle" font-size="42" font-weight="800" fill="#fff">2</text>
+    <text x="50" y="125" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">確認</text>
+    <text x="50" y="155" text-anchor="middle" font-size="13" fill="#475569">アプリ画面で</text>
+    <text x="50" y="173" text-anchor="middle" font-size="13" fill="#475569">境界とファイル名を調整</text>
+    <text x="50" y="200" text-anchor="middle" font-size="11" fill="#94a3b8">候補名は OCR から自動入力</text>
+  </g>
+
+  <text x="610" y="1010" font-size="40" fill="#cbd5e1">→</text>
+
+  <!-- Step 3 -->
+  <g transform="translate(760, 940)">
+    <circle cx="50" cy="50" r="46" fill="url(#accent)"/>
+    <text x="50" y="64" text-anchor="middle" font-size="42" font-weight="800" fill="#fff">3</text>
+    <text x="50" y="125" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">分割＆リネーム</text>
+    <text x="50" y="155" text-anchor="middle" font-size="13" fill="#475569">ボタン2回で</text>
+    <text x="50" y="173" text-anchor="middle" font-size="13" fill="#475569">完了</text>
+    <text x="50" y="200" text-anchor="middle" font-size="11" fill="#94a3b8">YYYY-MM-DD_xxx.pdf に命名</text>
+  </g>
+
+  <!-- ===== ベネフィット (1200 〜 1430) ===== -->
+  <rect x="0" y="1200" width="1240" height="240" fill="#ffffff"/>
+  <text x="620" y="1250" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">こんな業務に最適</text>
+
+  <g transform="translate(120, 1290)">
+    <text x="0" y="0" font-size="22" fill="#10b981">✓</text>
+    <text x="30" y="0" font-size="16" font-weight="700" fill="#0f172a">月◯時間の手作業削減</text>
+    <text x="30" y="22" font-size="13" fill="#475569">複合機・ScanSnapまとめスキャン後の仕分け＆命名が自動化</text>
+  </g>
+  <g transform="translate(660, 1290)">
+    <text x="0" y="0" font-size="22" fill="#10b981">✓</text>
+    <text x="30" y="0" font-size="16" font-weight="700" fill="#0f172a">命名規則の統一・電帳法対応補助</text>
+    <text x="30" y="22" font-size="13" fill="#475569">プロファイル(TOML)で部署ごとに規則カスタマイズ可</text>
+  </g>
+  <g transform="translate(120, 1360)">
+    <text x="0" y="0" font-size="22" fill="#10b981">✓</text>
+    <text x="30" y="0" font-size="16" font-weight="700" fill="#0f172a">機密書類でも安心のローカル動作</text>
+    <text x="30" y="22" font-size="13" fill="#475569">クラウドではなく自社PC内で処理。社外送信なし</text>
+  </g>
+  <g transform="translate(660, 1360)">
+    <text x="0" y="0" font-size="22" fill="#10b981">✓</text>
+    <text x="30" y="0" font-size="16" font-weight="700" fill="#0f172a">無料・MIT OSS</text>
+    <text x="30" y="22" font-size="13" fill="#475569">月額課金・サインアップなし。Windowsはダブルクリック起動</text>
+  </g>
+
+  <!-- ===== CTA + QR (1440 〜 1660) — ダーク帯 ===== -->
+  <rect x="0" y="1440" width="1240" height="220" fill="url(#bgTop)"/>
+  <rect x="0" y="1440" width="1240" height="220" fill="url(#glow1)"/>
+
+  <text x="120" y="1505" font-size="22" font-weight="700" fill="#f8fafc">いますぐ無料ダウンロード</text>
+  <text x="120" y="1540" font-size="14" fill="#94a3b8">GitHub Releases から実行ファイルを取得</text>
+
+  <!-- URL ボックス -->
+  <rect x="120" y="1560" width="640" height="60" rx="10" fill="url(#accent)"/>
+  <text x="440" y="1598" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">github.com/ShigetoshiMizuno/pdf-split-autorenamer</text>
+
+  <!-- QR コード placeholder -->
+  <g transform="translate(890, 1470)">
+    <rect width="180" height="180" fill="#fff" rx="6"/>
+    <!-- QR の見た目モック -->
+    <g fill="#0f172a">
+      <rect x="20" y="20" width="40" height="40"/>
+      <rect x="120" y="20" width="40" height="40"/>
+      <rect x="20" y="120" width="40" height="40"/>
+      <rect x="80" y="80" width="20" height="20"/>
+      <rect x="100" y="100" width="20" height="20"/>
+      <rect x="80" y="40" width="20" height="20"/>
+      <rect x="40" y="80" width="20" height="20"/>
+      <rect x="120" y="80" width="20" height="20"/>
+      <rect x="80" y="120" width="20" height="20"/>
+      <rect x="120" y="140" width="20" height="20"/>
+      <rect x="140" y="120" width="20" height="20"/>
+      <rect x="60" y="60" width="10" height="10"/>
+      <rect x="100" y="40" width="10" height="10"/>
+    </g>
+    <rect width="180" height="180" fill="none" stroke="#cbd5e1"/>
+  </g>
+  <text x="980" y="1665" text-anchor="middle" font-size="11" fill="#94a3b8">スマホでスキャン</text>
+
+  <!-- ===== フッター (1660 〜 1754) ===== -->
+  <rect x="0" y="1660" width="1240" height="94" fill="#020617"/>
+  <text x="120" y="1700" font-size="14" font-weight="600" fill="#cbd5e1">提供: Nongsoft / Shigetoshi Mizuno</text>
+  <text x="120" y="1722" font-size="12" fill="#64748b">MIT License — お問い合わせ: info@nongsoft.com</text>
+  <text x="1120" y="1700" text-anchor="end" font-size="12" fill="#64748b">v0.4.0 candidate</text>
+  <text x="1120" y="1722" text-anchor="end" font-size="11" fill="#475569">本チラシは試作版（外部AI生成前の下絵）</text>
+</svg>
