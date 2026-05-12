@@ -41,6 +41,7 @@ def _make_page(
     title_markers: list[str] | None = None,
     thumb: str = "",
     text_head: str = "",
+    kind: str = "書類",
 ) -> dict:
     """テスト用の最小ページ dict を生成する"""
     return {
@@ -53,6 +54,7 @@ def _make_page(
         "title_markers": title_markers if title_markers is not None else [],
         "thumb": thumb,
         "text_head": text_head,
+        "kind": kind,
     }
 
 
@@ -185,6 +187,44 @@ class TestScoreBoundary:
         cur = _make_page(page=2, bigram={"ab", "bc", "cd"}, orient="P")
         score, _ = score_boundary(prev, cur)
         assert score >= 0.4
+
+    # ----- issue #38: 書類タイプ (kind) 変化を強い境界として扱う -----
+
+    def test_kind_change_raises_score_above_threshold(self):
+        """issue #38: kind が変わると境界判定（>= 0.5）を確実に超える"""
+        prev = _make_page(orient="P", bigram={"ab", "bc"}, kind="請求書")
+        cur = _make_page(page=2, orient="P", bigram={"ab", "bc"}, kind="見積書")
+        score, reasons = score_boundary(prev, cur)
+        assert score >= 0.5, f"kind 変化で境界閾値を超えない: score={score}"
+
+    def test_kind_change_reasons_mention_kind(self):
+        """issue #38: kind 変化が reasons に含まれる"""
+        prev = _make_page(kind="請求書", bigram={"a"})
+        cur = _make_page(page=2, kind="議事録", bigram={"a"})
+        score, reasons = score_boundary(prev, cur)
+        assert any("書類タイプ" in r or "kind" in r.lower() for r in reasons), (
+            f"reasons に書類タイプ変化が含まれない: {reasons}"
+        )
+
+    def test_same_kind_no_extra_score(self):
+        """issue #38: kind が同じなら kind 由来の加点はゼロ"""
+        shared = {"ab", "bc", "cd", "de", "ef", "fg", "gh", "hi"}
+        prev = _make_page(bigram=shared, kind="請求書")
+        cur = _make_page(page=2, bigram=shared, kind="請求書")
+        score, reasons = score_boundary(prev, cur)
+        # bigram 完全一致 + kind 同じ → スコアは低い
+        assert score < 0.5
+
+    def test_kind_default_書類_treated_as_no_change(self):
+        """issue #38: kind が両方 '書類' (デフォルト) なら kind 由来の加点なし。
+
+        フォールバック分類は「タイプ不明」を意味するため、境界手がかりにしない。
+        """
+        shared = {"ab", "bc"}
+        prev = _make_page(bigram=shared, kind="書類")
+        cur = _make_page(page=2, bigram=shared, kind="書類")
+        score, _ = score_boundary(prev, cur)
+        assert score < 0.5
 
 
 class TestBigramInternal:
