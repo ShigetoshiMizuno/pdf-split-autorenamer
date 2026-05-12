@@ -579,6 +579,128 @@ class TestToggleAdvanced:
 # main + __main__ guard
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# issue #48: Menubutton 統合入力ボタンのテスト
+# ---------------------------------------------------------------------------
+
+class TestMenubuttonInput:
+    def test_input_button_is_menubutton(self):
+        """issue #48: 入力選択ボタンが Menubutton であること"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        with patch.object(gui_module, "ttk", MagicMock()) as mock_ttk, \
+             patch.object(gui_module, "tk", MagicMock()), \
+             patch("logging.getLogger", return_value=MagicMock()):
+            app._build_ui()
+        # Menubutton が呼ばれていること
+        mock_ttk.Menubutton.assert_called()
+
+    def test_input_paths_attribute_exists(self):
+        """issue #48: App に _input_paths 属性が存在すること"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        app._input_paths = []  # _make_app は __init__ をスキップするので明示設定
+        assert hasattr(app, "_input_paths")
+        assert isinstance(app._input_paths, list)
+
+    def test_on_browse_sets_input_paths_single_folder(self, tmp_path):
+        """issue #48: フォルダ選択で _input_paths が [Path(folder)] になる"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app()
+        app._input_paths = []
+        with patch.object(gui_module.filedialog, "askdirectory",
+                          return_value=str(tmp_path)):
+            app._on_browse()
+        assert app._input_paths == [tmp_path]
+
+    def test_on_browse_files_sets_multiple_input_paths(self, tmp_path):
+        """issue #48: 複数 PDF 選択で _input_paths に複数 Path が入る"""
+        from pdf_split_autorenamer import gui as gui_module
+        pdf1 = tmp_path / "a.pdf"
+        pdf2 = tmp_path / "b.pdf"
+        pdf1.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        pdf2.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app()
+        app._input_paths = []
+        with patch.object(gui_module.filedialog, "askopenfilenames",
+                          return_value=(str(pdf1), str(pdf2))):
+            app._on_browse_files()
+        assert set(app._input_paths) == {pdf1, pdf2}
+
+    def test_on_browse_files_single_pdf_updates_folder_var(self, tmp_path):
+        """issue #48: 単一 PDF 選択で folder_var がそのパスになる"""
+        from pdf_split_autorenamer import gui as gui_module
+        pdf1 = tmp_path / "a.pdf"
+        pdf1.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app()
+        app._input_paths = []
+        with patch.object(gui_module.filedialog, "askopenfilenames",
+                          return_value=(str(pdf1),)):
+            app._on_browse_files()
+        assert app.folder_var.get() == str(pdf1)
+
+    def test_on_browse_files_multiple_pdfs_shows_summary_in_folder_var(self, tmp_path):
+        """issue #48: 複数 PDF 選択で folder_var がサマリー文字列になる"""
+        from pdf_split_autorenamer import gui as gui_module
+        pdf1 = tmp_path / "a.pdf"
+        pdf2 = tmp_path / "b.pdf"
+        pdf3 = tmp_path / "c.pdf"
+        for p in [pdf1, pdf2, pdf3]:
+            p.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app()
+        app._input_paths = []
+        with patch.object(gui_module.filedialog, "askopenfilenames",
+                          return_value=(str(pdf1), str(pdf2), str(pdf3))):
+            app._on_browse_files()
+        summary = app.folder_var.get()
+        # 件数が含まれること
+        assert "3" in summary
+
+    def test_on_browse_files_cancel_keeps_existing(self):
+        """issue #48: ファイル選択キャンセル時は _input_paths と folder_var を変更しない"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("/original")
+        app._input_paths = []
+        with patch.object(gui_module.filedialog, "askopenfilenames",
+                          return_value=()):
+            app._on_browse_files()
+        assert app.folder_var.get() == "/original"
+        assert app._input_paths == []
+
+    def test_get_inputs_returns_folder_path(self, tmp_path):
+        """issue #48: フォルダが設定されているとき _get_inputs が Path を返す"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app(str(tmp_path))
+        app._input_paths = [tmp_path]
+        result = app._get_inputs()
+        assert result == tmp_path
+
+    def test_get_inputs_returns_list_for_multiple_pdfs(self, tmp_path):
+        """issue #48: 複数 PDF が設定されているとき _get_inputs が list[Path] を返す"""
+        from pdf_split_autorenamer import gui as gui_module
+        pdf1 = tmp_path / "a.pdf"
+        pdf2 = tmp_path / "b.pdf"
+        for p in [pdf1, pdf2]:
+            p.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        app = _make_app()
+        app._input_paths = [pdf1, pdf2]
+        result = app._get_inputs()
+        assert isinstance(result, list)
+        assert set(result) == {pdf1, pdf2}
+
+    def test_get_inputs_empty_shows_warning(self):
+        """issue #48: _input_paths が空かつ folder_var も空なら警告を出して None を返す"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("")
+        app._input_paths = []
+        # messagebox.showwarning は Tk インスタンスを必要とするためモック
+        with patch.object(gui_module.messagebox, "showwarning") as mw, \
+             patch.object(app, "update_idletasks", return_value=None):
+            result = app._get_inputs()
+        assert result is None
+        mw.assert_called_once()
+
+
 class TestMain:
     def test_main_creates_app_and_mainloops(self):
         """main() が App を生成して mainloop() を呼ぶこと"""

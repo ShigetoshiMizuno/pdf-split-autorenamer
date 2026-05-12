@@ -314,3 +314,47 @@ class TestCollectPages:
         # Second call should reuse existing thumbnail (no re-render)
         collect_pages(tmp_path, thumb_dir)
         assert len(list(thumb_dir.glob("*.jpg"))) == 1
+
+
+# ---------------------------------------------------------------------------
+# issue #48: run_analyze が list[Path] を受け付けること
+# ---------------------------------------------------------------------------
+
+class TestRunAnalyzeMultipleInputs:
+    def test_run_analyze_with_list_of_pdfs(self, tmp_path):
+        """issue #48: run_analyze に list[Path] を渡すと指定 PDF だけが処理される"""
+        pdf_a = _make_pdf(tmp_path / "a.pdf", pages=1, text="テスト文書A")
+        pdf_b = _make_pdf(tmp_path / "b.pdf", pages=1, text="テスト文書B")
+        _make_pdf(tmp_path / "c.pdf", pages=1, text="対象外文書C")
+        # a.pdf と b.pdf のみを指定
+        res = run_analyze([pdf_a, pdf_b])
+        # 2 ページ分だけ処理されること（c.pdf は除外）
+        assert res["pages"] == 2
+
+    def test_run_analyze_list_single_pdf(self, tmp_path):
+        """issue #48: list に単一 PDF を渡しても動作する"""
+        pdf_a = _make_pdf(tmp_path / "only.pdf", pages=2, text="テスト")
+        res = run_analyze([pdf_a])
+        assert res["pages"] == 2
+
+    def test_run_analyze_list_creates_report(self, tmp_path):
+        """issue #48: list[Path] 渡しでも report_html が生成される"""
+        pdf_a = _make_pdf(tmp_path / "a.pdf", pages=1, text="文書")
+        res = run_analyze([pdf_a])
+        assert res.get("report_html") is not None
+        assert Path(res["report_html"]).exists()
+
+    def test_run_analyze_single_path_still_works(self, tmp_path):
+        """issue #48: 既存の単一 Path 渡しも引き続き動作する（後方互換）"""
+        _make_pdf(tmp_path / "doc.pdf", pages=1, text="既存の使い方")
+        res = run_analyze(tmp_path)
+        assert res["pages"] == 1
+
+    def test_run_analyze_list_work_dir_uses_common_parent_psar(self, tmp_path):
+        """issue #48: list[Path] 渡しのとき .psar は共通親ディレクトリ直下に置かれる"""
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        pdf_a = _make_pdf(sub / "a.pdf", pages=1, text="文書")
+        res = run_analyze([pdf_a])
+        psar = sub / ".psar"
+        assert psar.exists()

@@ -318,3 +318,57 @@ class TestRunSplit:
             result = run_split(tmp_path)
         statuses = [a["status"] for a in result["actions"]]
         assert any("error" in s for s in statuses)
+
+
+# ---------------------------------------------------------------------------
+# issue #48: run_split が list[Path] を受け付けること
+# ---------------------------------------------------------------------------
+
+class TestRunSplitMultipleInputs:
+    def test_run_split_with_list_of_pdfs(self, tmp_path):
+        """issue #48: run_split に list[Path] を渡すと動作する"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1", "Page2", "Page3"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [
+                {"range": [1, 2], "name": ""},
+                {"range": [3, 3], "name": ""},
+            ]},
+        )
+        result = run_split([src], dry_run=True)
+        assert result["total_input_pages"] == 3
+        assert len(result["actions"]) == 2
+
+    def test_run_split_list_single_pdf(self, tmp_path):
+        """issue #48: list に単一 PDF を渡しても動作する"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 2], "name": ""}]},
+        )
+        result = run_split([src], dry_run=True)
+        assert result["total_input_pages"] == 2
+
+    def test_run_split_single_path_still_works(self, tmp_path):
+        """issue #48: 既存の単一 Path 渡しも引き続き動作する（後方互換）"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1", "Page2"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 2], "name": ""}]},
+        )
+        result = run_split(tmp_path, dry_run=True)
+        assert result["total_input_pages"] == 2
+
+    def test_run_split_list_uses_common_parent_for_work_dir(self, tmp_path):
+        """issue #48: list[Path] のとき work_dir は共通親ディレクトリの .psar が使われる"""
+        src = tmp_path / "source.pdf"
+        src.write_bytes(_make_multipage_pdf(["Page1"]))
+        _write_groups_json(
+            tmp_path / ".psar",
+            {"source.pdf": [{"range": [1, 1], "name": ""}]},
+        )
+        result = run_split([src], dry_run=True)
+        assert result["total_input_pages"] == 1
