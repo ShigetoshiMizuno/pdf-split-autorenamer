@@ -707,6 +707,45 @@ class TestMenubuttonInput:
         assert result is None
         mw.assert_called_once()
 
+    def test_get_inputs_single_invalid_path_shows_error_and_returns_none(self, tmp_path):
+        """issue #58: _input_paths に単一の無効パスが入っているとき、エラー表示 + None"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("")
+        # 存在しないパス（is_dir も is_file も False）
+        bogus = tmp_path / "deleted_nonexistent.pdf"
+        app._input_paths = [bogus]
+        with patch.object(gui_module.messagebox, "showerror") as me, \
+             patch.object(app, "update_idletasks", return_value=None):
+            result = app._get_inputs()
+        assert result is None
+        me.assert_called_once()
+
+    def test_get_inputs_multiple_all_invalid_shows_error_and_returns_none(self, tmp_path):
+        """issue #58: _input_paths が複数だが全て無効な場合、エラー表示 + None"""
+        from pdf_split_autorenamer import gui as gui_module
+        app = _make_app("")
+        bogus1 = tmp_path / "ghost1.pdf"
+        bogus2 = tmp_path / "ghost2.pdf"
+        app._input_paths = [bogus1, bogus2]
+        with patch.object(gui_module.messagebox, "showerror") as me, \
+             patch.object(app, "update_idletasks", return_value=None):
+            result = app._get_inputs()
+        assert result is None
+        me.assert_called_once()
+
+    def test_get_inputs_multiple_partial_valid_returns_valid_only(self, tmp_path):
+        """issue #58: 一部有効・一部無効なら、有効な PDF のみ list で返す"""
+        from pdf_split_autorenamer import gui as gui_module
+        pdf_ok = tmp_path / "real.pdf"
+        pdf_ok.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        ghost = tmp_path / "missing.pdf"
+        app = _make_app("")
+        app._input_paths = [pdf_ok, ghost]
+        with patch.object(gui_module.messagebox, "showerror"), \
+             patch.object(app, "update_idletasks", return_value=None):
+            result = app._get_inputs()
+        assert result == [pdf_ok]
+
 
 class TestMain:
     def test_main_creates_app_and_mainloops(self):
