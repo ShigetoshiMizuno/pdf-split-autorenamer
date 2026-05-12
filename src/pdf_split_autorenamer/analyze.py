@@ -595,7 +595,7 @@ function saveJson() {
     const a = document.createElement('a');
     a.href = url; a.download = 'groups.json'; a.click();
     URL.revokeObjectURL(url);
-    alert('分割設定ファイル（groups.json）をダウンロードしました。\nダウンロードしたファイルを作業フォルダ (.psar) に移動してから\n本体の「2. 分割 → 実行」を押してください。');
+    alert('分割設定をダウンロードしました。\nダウンロードしたファイルを作業フォルダに移動してから\n本体の「2. 分割 → 実行」を押してください。');
   }
 }
 function resetGroups() {

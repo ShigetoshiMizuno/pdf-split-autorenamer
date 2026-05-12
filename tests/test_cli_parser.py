@@ -393,14 +393,16 @@ class TestCmdAnalyze:
         with patch("pdf_split_autorenamer.analyze.run_analyze", return_value=mock_result):
             cmd_analyze(args)
         captured = capsys.readouterr()
-        # ユーザー向け用語が含まれること
-        assert "編集画面" in captured.out or "分割設定" in captured.out, \
-            f"issue #50: 「編集画面」または「分割設定」が CLI 出力にない: {captured.out!r}"
-        # 内部ファイル名が直接表示されないこと
-        assert "report.html" not in captured.out, \
-            f"issue #50: 内部ファイル名 'report.html' が CLI 出力に露出している: {captured.out!r}"
-        assert "groups.json" not in captured.out, \
-            f"issue #50: 内部ファイル名 'groups.json' が CLI 出力に露出している: {captured.out!r}"
+        # ユーザー向けラベルが使われていること（パス自体は含まれて良い）
+        assert "編集画面:" in captured.out, \
+            f"issue #50: 「編集画面:」ラベルが CLI 出力にない: {captured.out!r}"
+        assert "分割設定:" in captured.out, \
+            f"issue #50: 「分割設定:」ラベルが CLI 出力にない: {captured.out!r}"
+        # 「レポート:」「groups.json:」という内部用語ラベルが消えていること
+        assert "レポート:" not in captured.out, \
+            f"issue #50: 内部用語ラベル「レポート:」が CLI 出力に残っている: {captured.out!r}"
+        assert "groups.json:" not in captured.out, \
+            f"issue #50: 内部用語ラベル「groups.json:」が CLI 出力に残っている: {captured.out!r}"
 
 
 class TestCmdSplit:

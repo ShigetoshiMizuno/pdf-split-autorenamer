@@ -67,7 +67,7 @@ def run_split(src_dir: Path, work_dir: Path | None = None,
     work_dir = Path(work_dir) if work_dir else (src_dir / ".psar")
     groups_path = work_dir / "groups.json"
     if not groups_path.exists():
-        raise FileNotFoundError(f"groups.json が見つかりません: {groups_path}")
+        raise FileNotFoundError(f"分割設定（groups.json）が見つかりません: {groups_path}")
 
     raw = json.loads(groups_path.read_text(encoding="utf-8"))
     groups = normalize_groups(raw)
